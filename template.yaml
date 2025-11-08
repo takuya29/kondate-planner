@@ -55,12 +55,25 @@ Resources:
         AllowHeaders:
           - "*"
 
+  # Lambda Layer
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: kondate-common-layer
+      ContentUri: src/layers/common/
+      CompatibleRuntimes:
+        - python3.12
+      LicenseInfo: 'MIT'
+      RetentionPolicy: Retain
+
   # Lambda Functions
   SuggestMenuFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/suggest_menu/
       Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref RecipesTable
@@ -92,6 +105,8 @@ Resources:
     Properties:
       CodeUri: src/get_recipes/
       Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref RecipesTable
@@ -108,6 +123,8 @@ Resources:
     Properties:
       CodeUri: src/create_recipe/
       Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref RecipesTable
@@ -124,6 +141,8 @@ Resources:
     Properties:
       CodeUri: src/save_history/
       Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref MenuHistoryTable
@@ -140,6 +159,8 @@ Resources:
     Properties:
       CodeUri: src/save_history/
       Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
       Policies:
         - DynamoDBReadPolicy:
             TableName: !Ref MenuHistoryTable
