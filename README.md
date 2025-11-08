@@ -8,6 +8,189 @@ AWS SAMを使った個人利用の献立提案APIです。Amazon Bedrock (Claude
 - **レシピ管理**: レシピの作成・取得
 - **献立履歴**: 過去の献立履歴を保存・取得
 
+## システムアーキテクチャ
+
+### 全体構成
+
+```mermaid
+graph TB
+    Client[クライアント<br/>cURLなど]
+
+    subgraph AWS["AWS Cloud (ap-northeast-1)"]
+        APIGW[API Gateway<br/>HTTP API]
+
+        subgraph Lambda["Lambda Functions (Python 3.12)"]
+            SuggestMenu[献立提案<br/>SuggestMenuFunction]
+            GetRecipes[レシピ取得<br/>GetRecipesFunction]
+            CreateRecipe[レシピ作成<br/>CreateRecipeFunction]
+            SaveHistory[履歴保存・取得<br/>SaveHistoryFunction]
+        end
+
+        subgraph Storage["データストア"]
+            RecipesDB[(DynamoDB<br/>kondate-recipes)]
+            HistoryDB[(DynamoDB<br/>kondate-menu-history)]
+        end
+
+        Bedrock[Amazon Bedrock<br/>Claude Sonnet 4.5<br/>Inference Profile]
+    end
+
+    Client -->|HTTP Request| APIGW
+
+    APIGW -->|POST /suggest| SuggestMenu
+    APIGW -->|GET /recipes| GetRecipes
+    APIGW -->|POST /recipes| CreateRecipe
+    APIGW -->|GET/POST /history| SaveHistory
+
+    SuggestMenu -->|全レシピ取得| RecipesDB
+    SuggestMenu -->|過去の履歴取得| HistoryDB
+    SuggestMenu -->|AI献立提案| Bedrock
+
+    GetRecipes -->|レシピ取得/検索| RecipesDB
+    CreateRecipe -->|レシピ保存| RecipesDB
+
+    SaveHistory -->|履歴保存/取得| HistoryDB
+
+    APIGW -->|HTTP Response| Client
+```
+
+### APIフロー
+
+#### 献立提案フロー
+
+```mermaid
+sequenceDiagram
+    participant Client as クライアント
+    participant APIGW as API Gateway
+    participant Lambda as SuggestMenuFunction
+    participant RecipesDB as recipes テーブル
+    participant HistoryDB as menu_history テーブル
+    participant Bedrock as Amazon Bedrock
+
+    Client->>APIGW: POST /suggest<br/>{days: 3 or 7}
+    APIGW->>Lambda: イベント実行
+
+    Lambda->>RecipesDB: 全レシピ取得<br/>Scan操作
+    RecipesDB-->>Lambda: レシピリスト
+
+    Lambda->>HistoryDB: 過去30日の履歴取得<br/>Scan + フィルタ
+    HistoryDB-->>Lambda: 献立履歴
+
+    Lambda->>Lambda: プロンプト構築<br/>・レシピ情報<br/>・過去の使用履歴<br/>・日数指定
+
+    Lambda->>Bedrock: InvokeModel<br/>Claude Sonnet 4.5
+    Bedrock-->>Lambda: JSON形式の献立案
+
+    Lambda->>Lambda: レスポンス整形
+    Lambda-->>APIGW: 献立プラン
+    APIGW-->>Client: JSON Response
+```
+
+#### レシピ管理フロー
+
+```mermaid
+sequenceDiagram
+    participant Client as クライアント
+    participant APIGW as API Gateway
+    participant GetLambda as GetRecipesFunction
+    participant CreateLambda as CreateRecipeFunction
+    participant DB as recipes テーブル
+
+    Note over Client,DB: レシピ取得
+    Client->>APIGW: GET /recipes?category=メイン
+    APIGW->>GetLambda: イベント実行
+    GetLambda->>DB: Scan + フィルタリング
+    DB-->>GetLambda: レシピリスト
+    GetLambda-->>APIGW: レシピデータ
+    APIGW-->>Client: JSON Response
+
+    Note over Client,DB: レシピ作成
+    Client->>APIGW: POST /recipes<br/>{name, category, ...}
+    APIGW->>CreateLambda: イベント実行
+    CreateLambda->>CreateLambda: バリデーション<br/>ID生成<br/>タイムスタンプ追加
+    CreateLambda->>DB: PutItem操作
+    DB-->>CreateLambda: 保存完了
+    CreateLambda-->>APIGW: 作成されたレシピ
+    APIGW-->>Client: JSON Response
+```
+
+#### 献立履歴フロー
+
+```mermaid
+sequenceDiagram
+    participant Client as クライアント
+    participant APIGW as API Gateway
+    participant Lambda as SaveHistoryFunction
+    participant DB as menu_history テーブル
+
+    Note over Client,DB: 履歴取得
+    Client->>APIGW: GET /history?days=7
+    APIGW->>Lambda: イベント実行(GET)
+    Lambda->>Lambda: 日付範囲計算
+    Lambda->>DB: Scan + フィルタリング<br/>(過去N日分)
+    DB-->>Lambda: 履歴リスト
+    Lambda->>Lambda: 日付でソート
+    Lambda-->>APIGW: 履歴データ
+    APIGW-->>Client: JSON Response
+
+    Note over Client,DB: 履歴保存
+    Client->>APIGW: POST /history<br/>{date, meals, notes}
+    APIGW->>Lambda: イベント実行(POST)
+    Lambda->>Lambda: バリデーション<br/>recipe_id抽出<br/>タイムスタンプ追加
+    Lambda->>DB: PutItem操作
+    DB-->>Lambda: 保存完了
+    Lambda-->>APIGW: 保存された履歴
+    APIGW-->>Client: JSON Response
+```
+
+### データモデル関係
+
+```mermaid
+erDiagram
+    RECIPES ||--o{ MENU_HISTORY : "使用される"
+
+    RECIPES {
+        string recipe_id PK
+        string name
+        string category
+        number cooking_time
+        list ingredients
+        string instructions
+        list tags
+        string created_at
+        string updated_at
+    }
+
+    MENU_HISTORY {
+        string date PK
+        map meals
+        list recipes
+        string notes
+        string created_at
+        string updated_at
+    }
+
+    MEALS {
+        list breakfast
+        list lunch
+        list dinner
+    }
+
+    MENU_HISTORY ||--|| MEALS : "含む"
+```
+
+### コンポーネント説明
+
+| コンポーネント | 役割 | 主要機能 |
+|---------------|------|---------|
+| **API Gateway** | HTTPエンドポイント提供 | ルーティング、CORS設定 |
+| **SuggestMenuFunction** | AI献立提案 | レシピ取得、履歴分析、Bedrock連携 |
+| **GetRecipesFunction** | レシピ参照 | カテゴリフィルタ、一覧取得 |
+| **CreateRecipeFunction** | レシピ登録 | バリデーション、ID生成 |
+| **SaveHistoryFunction** | 履歴管理 | 保存・取得、日付フィルタリング |
+| **DynamoDB (recipes)** | レシピ永続化 | NoSQLストレージ |
+| **DynamoDB (menu_history)** | 履歴永続化 | 日付ベースの履歴管理 |
+| **Amazon Bedrock** | AI推論 | Claude Sonnet 4.5による献立生成 |
+
 ## 技術スタック
 
 - **Lambda**: Python 3.12
