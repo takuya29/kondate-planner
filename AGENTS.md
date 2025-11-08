@@ -85,8 +85,14 @@ pip install -r src/suggest_menu/requirements.txt
    - GET: Supports `?days=N` query parameter (1-365, default 30)
    - Uses `safe_int_conversion()` utility for integer validation
 
-### Data Flow for Menu Suggestion
+### Shared Lambda Layer (`src/layers/common/python/utils.py`)
 
+To reduce code duplication, a shared Lambda Layer is used. It provides common utilities to all functions. Key components include:
+- **AWS Clients**: `dynamodb` and `bedrock` clients are initialized once and imported.
+- **`create_response(status_code, body)`**: A helper to generate standardized API Gateway JSON responses.
+- **`decimal_to_float(obj)`**: Recursively converts DynamoDB `Decimal` objects to Python `float` or `int`.
+
+### Data Flow for Menu Suggestion
 1. Client POSTs to `/suggest` with `{"days": 3 or 7}`
 2. Lambda fetches all recipes (DynamoDB Scan on `kondate-recipes`)
 3. Lambda fetches recent 30-day history (individual GetItem calls on `kondate-menu-history`)
@@ -124,23 +130,23 @@ Incorrect model IDs will fail with "The provided model identifier is invalid" or
 
 ### JSON Parsing from Bedrock
 
-Bedrock responses may contain JSON wrapped in markdown code blocks. The `call_bedrock()` function in `src/suggest_menu/app.py:153-164` handles this by:
+Bedrock responses may contain JSON wrapped in markdown code blocks. The `call_bedrock()` function in `src/suggest_menu/app.py` handles this by:
 1. Checking for ` ```json` markers and extracting content
 2. Falling back to generic ` ``` ` markers
 3. Using try-except with detailed error logging for JSONDecodeError
 
 ### Date and Integer Validation
 
-Use the `safe_int_conversion()` utility (defined in `src/save_history/app.py:16-52`) for validating integer inputs like `days` query parameters. It provides:
+Use the `safe_int_conversion()` utility for validating integer inputs like `days` query parameters. It provides:
 - Type conversion with clear error messages
 - Range validation (min/max)
 - Default value handling
 
-Date validation requires exact `YYYY-MM-DD` format (see `validate_date_format()` in `src/save_history/app.py:66-72`).
+Date validation requires exact `YYYY-MM-DD` format (see `validate_date_format()`).
 
 ### Decimal Handling
 
-DynamoDB returns numeric values as `Decimal` objects. Use the `decimal_to_float()` helper (present in multiple files) to recursively convert Decimals to int/float before JSON serialization.
+DynamoDB returns numeric values as `Decimal` objects. Use the `decimal_to_float()` helper, now centralized in the shared Lambda Layer, to recursively convert Decimals to int/float before JSON serialization.
 
 ## Testing Considerations
 

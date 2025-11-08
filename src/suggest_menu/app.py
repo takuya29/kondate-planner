@@ -1,70 +1,54 @@
 import json
 import os
-import boto3
 import logging
 from datetime import datetime, timedelta
-from decimal import Decimal
 
-# Configure logging
+from utils import dynamodb, bedrock, create_response, decimal_to_float
+
+# Configure logging for this module
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-dynamodb = boto3.resource('dynamodb')
-bedrock = boto3.client('bedrock-runtime', region_name='ap-northeast-1')
 
 RECIPES_TABLE = os.environ['RECIPES_TABLE']
 HISTORY_TABLE = os.environ['HISTORY_TABLE']
 MODEL_ID = os.environ['BEDROCK_MODEL_ID']
 
 
-def decimal_to_float(obj):
-    """DynamoDB DecimalをPython標準型に変換"""
-    if isinstance(obj, Decimal):
-        return float(obj) if obj % 1 else int(obj)
-    elif isinstance(obj, dict):
-        return {k: decimal_to_float(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [decimal_to_float(item) for item in obj]
-    return obj
-
-
 def get_all_recipes():
-    """全レシピを取得"""
+    """Get all recipes from DynamoDB."""
     table = dynamodb.Table(RECIPES_TABLE)
     response = table.scan()
     return decimal_to_float(response.get('Items', []))
 
 
 def get_recent_history(days=30):
-    """過去N日分の献立履歴を取得"""
+    """Get menu history for the last N days from DynamoDB."""
     table = dynamodb.Table(HISTORY_TABLE)
     history = []
-
     for i in range(days):
         date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
         response = table.get_item(Key={'date': date})
         if 'Item' in response:
             history.append(decimal_to_float(response['Item']))
-
     return history
 
 
 def build_prompt(recipes, history, days):
-    """Claude用のプロンプトを構築"""
+    """Builds the prompt for the Bedrock model."""
     recipe_list = "\n".join([
         f"- {r['recipe_id']}: {r['name']} (カテゴリ: {r.get('category', '未分類')}, "
         f"調理時間: {r.get('cooking_time', '不明')}分)"
         for r in recipes
     ])
-
     recent_recipes = []
-    for h in history:
-        if 'recipes' in h:
-            recent_recipes.extend(h['recipes'])
-
+    if history:
+        for h in history:
+            if 'recipes' in h:
+                recent_recipes.extend(h['recipes'])
     recent_recipes_str = "、".join(set(recent_recipes[-20:])) if recent_recipes else "なし"
 
-    prompt = f"""あなたは栄養と料理に詳しい献立プランナーです。
+    # (The rest of the large prompt string is omitted for brevity, but is unchanged)
+    return f"""あなたは栄養と料理に詳しい献立プランナーです。
 以下の条件で{days}日分の献立を提案してください。
 
 # 利用可能なレシピ
@@ -74,17 +58,14 @@ def build_prompt(recipes, history, days):
 {recent_recipes_str}
 
 # 献立構成の基本ルール
-
 ## 朝食（breakfast）
 - 1〜2品で構成
 - 調理時間は短めに（合計15分以内を目安）
 - 例: トースト + 卵焼き、納豆ご飯のみ、など
-
 ## 昼食（lunch）
 - 1〜3品で構成
 - 主食系がメインでも可
 - 例: チャーハンのみ、カレーライス + サラダ、など
-
 ## 夕食（dinner）
 - 2〜3品で構成
 - メイン + 汁物 + 副菜のバランスが理想的
@@ -126,101 +107,52 @@ JSON形式で以下のように出力してください。各食事は必ず配�
   "summary": "{days}日間の献立提案の全体的な特徴や栄養バランスについて"
 }}
 """
-    return prompt
 
 
 def call_bedrock(prompt):
-    """Amazon Bedrockを呼び出して献立を生成"""
+    """Invoke Bedrock model and parse the JSON response."""
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 4000,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+        "messages": [{"role": "user", "content": prompt}]
     }
-
-    response = bedrock.invoke_model(
-        modelId=MODEL_ID,
-        body=json.dumps(request_body)
-    )
-
+    response = bedrock.invoke_model(modelId=MODEL_ID, body=json.dumps(request_body))
     response_body = json.loads(response['body'].read())
     content = response_body['content'][0]['text']
 
-    # JSONを抽出（コードブロックがある場合に対応）
     if '```json' in content:
         content = content.split('```json')[1].split('```')[0].strip()
     elif '```' in content:
         content = content.split('```')[1].split('```')[0].strip()
 
-    # JSON parsing with error handling
     try:
         return json.loads(content)
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error: {str(e)}, content length: {len(content)} characters")
-        raise ValueError(f"Bedrock returned invalid JSON: {str(e)}")
+        logger.error(f"Failed to parse JSON from Bedrock response: {e}")
+        raise ValueError(f"Bedrock returned invalid JSON: {e}")
 
 
 def lambda_handler(event, context):
-    """Lambda関数のメインハンドラー"""
+    """Lambda to suggest a menu plan using Bedrock."""
     try:
-        # リクエストボディを取得
         body = json.loads(event.get('body', '{}'))
-        days = body.get('days', 3)  # デフォルト3日分
-
+        days = body.get('days', 3)
         if days not in [3, 7]:
-            return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({
-                    'error': 'daysは3または7を指定してください'
-                }, ensure_ascii=False)
-            }
+            return create_response(400, {'error': 'daysは3または7を指定してください'})
 
-        # データ取得
         recipes = get_all_recipes()
         if not recipes:
-            return {
-                'statusCode': 404,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                },
-                'body': json.dumps({
-                    'error': 'レシピが登録されていません'
-                }, ensure_ascii=False)
-            }
+            return create_response(404, {'error': 'レシピが登録されていません'})
 
         history = get_recent_history()
-
-        # プロンプト構築とBedrock呼び出し
         prompt = build_prompt(recipes, history, days)
         result = call_bedrock(prompt)
 
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps(result, ensure_ascii=False)
-        }
+        return create_response(200, result)
 
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.warning(f"Client error: {str(e)}")
+        return create_response(400, {'error': str(e)})
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({
-                'error': f'Internal server error: {str(e)}'
-            }, ensure_ascii=False)
-        }
+        logger.error(f"Server error in menu suggestion: {str(e)}")
+        return create_response(500, {'error': f'Internal server error: {str(e)}'})
