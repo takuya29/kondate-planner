@@ -9,12 +9,12 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-dynamodb = boto3.resource('dynamodb')
-bedrock = boto3.client('bedrock-runtime', region_name='ap-northeast-1')
+dynamodb = boto3.resource("dynamodb")
+bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
 
-RECIPES_TABLE = os.environ['RECIPES_TABLE']
-HISTORY_TABLE = os.environ['HISTORY_TABLE']
-MODEL_ID = os.environ['BEDROCK_MODEL_ID']
+RECIPES_TABLE = os.environ["RECIPES_TABLE"]
+HISTORY_TABLE = os.environ["HISTORY_TABLE"]
+MODEL_ID = os.environ["BEDROCK_MODEL_ID"]
 
 
 def decimal_to_float(obj):
@@ -32,7 +32,7 @@ def get_all_recipes():
     """全レシピを取得"""
     table = dynamodb.Table(RECIPES_TABLE)
     response = table.scan()
-    return decimal_to_float(response.get('Items', []))
+    return decimal_to_float(response.get("Items", []))
 
 
 def get_recent_history(days=30):
@@ -41,28 +41,32 @@ def get_recent_history(days=30):
     history = []
 
     for i in range(days):
-        date = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
-        response = table.get_item(Key={'date': date})
-        if 'Item' in response:
-            history.append(decimal_to_float(response['Item']))
+        date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        response = table.get_item(Key={"date": date})
+        if "Item" in response:
+            history.append(decimal_to_float(response["Item"]))
 
     return history
 
 
 def build_prompt(recipes, history, days):
     """Claude用のプロンプトを構築"""
-    recipe_list = "\n".join([
-        f"- {r['recipe_id']}: {r['name']} (カテゴリ: {r.get('category', '未分類')}, "
-        f"調理時間: {r.get('cooking_time', '不明')}分)"
-        for r in recipes
-    ])
+    recipe_list = "\n".join(
+        [
+            f"- {r['recipe_id']}: {r['name']} (カテゴリ: {r.get('category', '未分類')}, "
+            f"調理時間: {r.get('cooking_time', '不明')}分)"
+            for r in recipes
+        ]
+    )
 
     recent_recipes = []
     for h in history:
-        if 'recipes' in h:
-            recent_recipes.extend(h['recipes'])
+        if "recipes" in h:
+            recent_recipes.extend(h["recipes"])
 
-    recent_recipes_str = "、".join(set(recent_recipes[-20:])) if recent_recipes else "なし"
+    recent_recipes_str = (
+        "、".join(set(recent_recipes[-20:])) if recent_recipes else "なし"
+    )
 
     prompt = f"""あなたは栄養と料理に詳しい献立プランナーです。
 以下の条件で{days}日分の献立を提案してください。
@@ -134,33 +138,27 @@ def call_bedrock(prompt):
     request_body = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": 4000,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
+        "messages": [{"role": "user", "content": prompt}],
     }
 
-    response = bedrock.invoke_model(
-        modelId=MODEL_ID,
-        body=json.dumps(request_body)
-    )
+    response = bedrock.invoke_model(modelId=MODEL_ID, body=json.dumps(request_body))
 
-    response_body = json.loads(response['body'].read())
-    content = response_body['content'][0]['text']
+    response_body = json.loads(response["body"].read())
+    content = response_body["content"][0]["text"]
 
     # JSONを抽出（コードブロックがある場合に対応）
-    if '```json' in content:
-        content = content.split('```json')[1].split('```')[0].strip()
-    elif '```' in content:
-        content = content.split('```')[1].split('```')[0].strip()
+    if "```json" in content:
+        content = content.split("```json")[1].split("```")[0].strip()
+    elif "```" in content:
+        content = content.split("```")[1].split("```")[0].strip()
 
     # JSON parsing with error handling
     try:
         return json.loads(content)
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error: {str(e)}, content length: {len(content)} characters")
+        logger.error(
+            f"JSON parsing error: {str(e)}, content length: {len(content)} characters"
+        )
         raise ValueError(f"Bedrock returned invalid JSON: {str(e)}")
 
 
@@ -168,33 +166,33 @@ def lambda_handler(event, context):
     """Lambda関数のメインハンドラー"""
     try:
         # リクエストボディを取得
-        body = json.loads(event.get('body', '{}'))
-        days = body.get('days', 3)  # デフォルト3日分
+        body = json.loads(event.get("body", "{}"))
+        days = body.get("days", 3)  # デフォルト3日分
 
         if days not in [3, 7]:
             return {
-                'statusCode': 400,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
+                "statusCode": 400,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
                 },
-                'body': json.dumps({
-                    'error': 'daysは3または7を指定してください'
-                }, ensure_ascii=False)
+                "body": json.dumps(
+                    {"error": "daysは3または7を指定してください"}, ensure_ascii=False
+                ),
             }
 
         # データ取得
         recipes = get_all_recipes()
         if not recipes:
             return {
-                'statusCode': 404,
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
+                "statusCode": 404,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
                 },
-                'body': json.dumps({
-                    'error': 'レシピが登録されていません'
-                }, ensure_ascii=False)
+                "body": json.dumps(
+                    {"error": "レシピが登録されていません"}, ensure_ascii=False
+                ),
             }
 
         history = get_recent_history()
@@ -204,23 +202,23 @@ def lambda_handler(event, context):
         result = call_bedrock(prompt)
 
         return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
             },
-            'body': json.dumps(result, ensure_ascii=False)
+            "body": json.dumps(result, ensure_ascii=False),
         }
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+            "statusCode": 500,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
             },
-            'body': json.dumps({
-                'error': f'Internal server error: {str(e)}'
-            }, ensure_ascii=False)
+            "body": json.dumps(
+                {"error": f"Internal server error: {str(e)}"}, ensure_ascii=False
+            ),
         }

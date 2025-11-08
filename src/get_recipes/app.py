@@ -8,8 +8,8 @@ from decimal import Decimal
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-dynamodb = boto3.resource('dynamodb')
-RECIPES_TABLE = os.environ['RECIPES_TABLE']
+dynamodb = boto3.resource("dynamodb")
+RECIPES_TABLE = os.environ["RECIPES_TABLE"]
 
 
 def decimal_to_float(obj):
@@ -29,41 +29,40 @@ def lambda_handler(event, context):
         table = dynamodb.Table(RECIPES_TABLE)
 
         # クエリパラメータから検索条件を取得（オプション）
-        query_params = event.get('queryStringParameters', {}) or {}
-        category = query_params.get('category')
+        query_params = event.get("queryStringParameters", {}) or {}
+        category = query_params.get("category")
 
         # 全レシピを取得
         response = table.scan()
-        recipes = decimal_to_float(response.get('Items', []))
+        recipes = decimal_to_float(response.get("Items", []))
 
         # カテゴリでフィルタリング（指定された場合）
         if category:
-            recipes = [r for r in recipes if r.get('category') == category]
+            recipes = [r for r in recipes if r.get("category") == category]
 
         # レシピ名でソート
-        recipes.sort(key=lambda x: x.get('name', ''))
+        recipes.sort(key=lambda x: x.get("name", ""))
 
         return {
-            'statusCode': 200,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
             },
-            'body': json.dumps({
-                'recipes': recipes,
-                'count': len(recipes)
-            }, ensure_ascii=False)
+            "body": json.dumps(
+                {"recipes": recipes, "count": len(recipes)}, ensure_ascii=False
+            ),
         }
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")
         return {
-            'statusCode': 500,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+            "statusCode": 500,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
             },
-            'body': json.dumps({
-                'error': f'Internal server error: {str(e)}'
-            }, ensure_ascii=False)
+            "body": json.dumps(
+                {"error": f"Internal server error: {str(e)}"}, ensure_ascii=False
+            ),
         }
