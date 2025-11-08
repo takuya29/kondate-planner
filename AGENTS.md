@@ -107,7 +107,7 @@ To reduce code duplication, a shared Lambda Layer is used. It provides common ut
 ### DynamoDB Schema
 
 **kondate-recipes** (PK: recipe_id)
-- `name`, `category`, `cooking_time`, `ingredients[]`, `instructions`, `tags[]`, `created_at`, `updated_at`
+- `name`, `category`, `cooking_time`, `ingredients[]`, `recipe_url`, `tags[]`, `created_at`, `updated_at`
 
 **kondate-menu-history** (PK: date as YYYY-MM-DD)
 - `meals` (Map): `{breakfast: [{recipe_id, name}], lunch: [...], dinner: [...]}`
