@@ -1,8 +1,13 @@
 import json
 import os
 import boto3
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource('dynamodb')
 HISTORY_TABLE = os.environ['HISTORY_TABLE']
@@ -169,7 +174,7 @@ def lambda_handler(event, context):
             }
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         return {
             'statusCode': 500,
             'headers': {
