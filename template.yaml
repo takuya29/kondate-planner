@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 献立作成補助ツール API
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: python3.12
+    Environment:
+      Variables:
+        RECIPES_TABLE: !Ref RecipesTable
+        HISTORY_TABLE: !Ref MenuHistoryTable
+        BEDROCK_MODEL_ID: jp.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+Resources:
+  # DynamoDB Tables
+  RecipesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: kondate-recipes
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: recipe_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: recipe_id
+          KeyType: HASH
+
+  MenuHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: kondate-menu-history
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: date
+          KeyType: HASH
+
+  # API Gateway
+  KondateApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+        AllowHeaders:
+          - "*"
+
+  # Lambda Functions
+  SuggestMenuFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/suggest_menu/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RecipesTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref MenuHistoryTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource:
+                - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
+                - 'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
+                - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
+      Events:
+        SuggestMenu:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref KondateApi
+            Path: /suggest
+            Method: POST
+
+  GetRecipesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/get_recipes/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RecipesTable
+      Events:
+        GetRecipes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref KondateApi
+            Path: /recipes
+            Method: GET
+
+  CreateRecipeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/create_recipe/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref RecipesTable
+      Events:
+        CreateRecipe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref KondateApi
+            Path: /recipes
+            Method: POST
+
+  SaveHistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/save_history/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MenuHistoryTable
+      Events:
+        SaveHistory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref KondateApi
+            Path: /history
+            Method: POST
+
+  GetHistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/save_history/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref MenuHistoryTable
+      Events:
+        GetHistory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref KondateApi
+            Path: /history
+            Method: GET
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${KondateApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+  RecipesTableName:
+    Description: "DynamoDB Recipes table name"
+    Value: !Ref RecipesTable
+  MenuHistoryTableName:
+    Description: "DynamoDB Menu History table name"
+    Value: !Ref MenuHistoryTable
