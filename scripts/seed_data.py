@@ -7,8 +7,16 @@ DynamoDBにサンプルデータを投入するスクリプト
 """
 import boto3
 import argparse
+import logging
 from datetime import datetime, timedelta
 import random
+
+# Configure logging for CLI script
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s'  # Simple format for user-facing script
+)
+logger = logging.getLogger(__name__)
 
 # DynamoDBクライアント
 dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
@@ -200,10 +208,10 @@ def create_recipes(table_name, count):
 
         try:
             table.put_item(Item=recipe)
-            print(f"✓ レシピを作成: {recipe['name']}")
+            logger.info(f"✓ レシピを作成: {recipe['name']}")
             created_count += 1
         except Exception as e:
-            print(f"✗ レシピ作成エラー ({recipe['name']}): {str(e)}")
+            logger.error(f"✗ レシピ作成エラー ({recipe['name']}): {str(e)}")
 
     return created_count
 
@@ -218,7 +226,7 @@ def create_history(table_name, recipes_table_name, days):
     recipes = response.get('Items', [])
 
     if not recipes:
-        print("エラー: レシピが存在しません。先にレシピを作成してください。")
+        logger.error("エラー: レシピが存在しません。先にレシピを作成してください。")
         return 0
 
     created_count = 0
@@ -276,10 +284,10 @@ def create_history(table_name, recipes_table_name, days):
 
         try:
             table.put_item(Item=history)
-            print(f"✓ 履歴を作成: {date}")
+            logger.info(f"✓ 履歴を作成: {date}")
             created_count += 1
         except Exception as e:
-            print(f"✗ 履歴作成エラー ({date}): {str(e)}")
+            logger.error(f"✗ 履歴作成エラー ({date}): {str(e)}")
 
     return created_count
 
@@ -293,25 +301,25 @@ def main():
 
     args = parser.parse_args()
 
-    print("=" * 60)
-    print("献立プランナー - データ投入スクリプト")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("献立プランナー - データ投入スクリプト")
+    logger.info("=" * 60)
 
     # レシピを作成
-    print(f"\n[1/2] レシピを作成中... (最大{min(args.recipes, len(SAMPLE_RECIPES))}件)")
+    logger.info(f"\n[1/2] レシピを作成中... (最大{min(args.recipes, len(SAMPLE_RECIPES))}件)")
     recipe_count = create_recipes(args.recipes_table, min(args.recipes, len(SAMPLE_RECIPES)))
-    print(f"レシピ作成完了: {recipe_count}件")
+    logger.info(f"レシピ作成完了: {recipe_count}件")
 
     # 献立履歴を作成
-    print(f"\n[2/2] 献立履歴を作成中... ({args.history}日分)")
+    logger.info(f"\n[2/2] 献立履歴を作成中... ({args.history}日分)")
     history_count = create_history(args.history_table, args.recipes_table, args.history)
-    print(f"献立履歴作成完了: {history_count}件")
+    logger.info(f"献立履歴作成完了: {history_count}件")
 
-    print("\n" + "=" * 60)
-    print("データ投入完了!")
-    print(f"  レシピ: {recipe_count}件")
-    print(f"  献立履歴: {history_count}件")
-    print("=" * 60)
+    logger.info("\n" + "=" * 60)
+    logger.info("データ投入完了!")
+    logger.info(f"  レシピ: {recipe_count}件")
+    logger.info(f"  献立履歴: {history_count}件")
+    logger.info("=" * 60)
 
 
 if __name__ == '__main__':

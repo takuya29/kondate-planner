@@ -1,8 +1,13 @@
 import json
 import os
 import boto3
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource('dynamodb')
 bedrock = boto3.client('bedrock-runtime', region_name='ap-northeast-1')
@@ -151,7 +156,12 @@ def call_bedrock(prompt):
     elif '```' in content:
         content = content.split('```')[1].split('```')[0].strip()
 
-    return json.loads(content)
+    # JSON parsing with error handling
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parsing error: {str(e)}, content length: {len(content)} characters")
+        raise ValueError(f"Bedrock returned invalid JSON: {str(e)}")
 
 
 def lambda_handler(event, context):
@@ -203,7 +213,7 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        print(f"Error: {str(e)}")
+        logger.error(f"Error: {str(e)}")
         return {
             'statusCode': 500,
             'headers': {
