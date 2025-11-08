@@ -10,7 +10,10 @@ Globals:
       Variables:
         RECIPES_TABLE: !Ref RecipesTable
         HISTORY_TABLE: !Ref MenuHistoryTable
-        BEDROCK_MODEL_ID: jp.anthropic.claude-sonnet-4-5-20250929-v1:0
+        # sonnet-4.5
+        # BEDROCK_MODEL_ID: jp.anthropic.claude-sonnet-4-5-20250929-v1:0
+        # haiku-4.5
+        BEDROCK_MODEL_ID: jp.anthropic.claude-haiku-4-5-20251001-v1:0
 
 Resources:
   # DynamoDB Tables
@@ -68,9 +71,14 @@ Resources:
               Action:
                 - bedrock:InvokeModel
               Resource:
+                # sonnet-4.5
                 - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
                 - 'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
                 - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
+                # haiku-4.5
+                - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-haiku-4-5-20251001-v1:0'
+                - 'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0'
+                - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0'
       Events:
         SuggestMenu:
           Type: HttpApi
