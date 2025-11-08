@@ -160,7 +160,7 @@ erDiagram
         string category
         number cooking_time
         list ingredients
-        string instructions
+        string recipe_url
         list tags
         string created_at
         string updated_at
@@ -346,7 +346,7 @@ curl -X POST https://YOUR_API_ENDPOINT/prod/recipes \
     "category": "メイン",
     "cooking_time": 30,
     "ingredients": ["材料1", "材料2"],
-    "instructions": "作り方",
+    "recipe_url": "https://example.com/recipe/123",
     "tags": ["和食"]
   }'
 ```
@@ -443,7 +443,7 @@ aws dynamodb create-table \
 | category | String | カテゴリ（メイン、副菜、朝食、汁物など） |
 | cooking_time | Number | 調理時間（分） |
 | ingredients | List | 材料リスト |
-| instructions | String | 作り方 |
+| recipe_url | String | レシピのURL |
 | tags | List | タグリスト |
 | created_at | String | 作成日時 |
 | updated_at | String | 更新日時 |

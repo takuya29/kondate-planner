@@ -27,7 +27,7 @@ def lambda_handler(event, context):
             'category': body.get('category', '未分類'),
             'cooking_time': body.get('cooking_time', 30),
             'ingredients': body.get('ingredients', []),
-            'instructions': body.get('instructions', ''),
+            'recipe_url': body.get('recipe_url', ''),
             'tags': body.get('tags', []),
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
