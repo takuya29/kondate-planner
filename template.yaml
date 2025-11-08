@@ -118,6 +118,24 @@ Resources:
             Path: /recipes
             Method: GET
 
+  GetRecipeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/get_recipe/
+      Handler: app.lambda_handler
+      Layers:
+        - !Ref CommonLayer
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref RecipesTable
+      Events:
+        GetRecipe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref KondateApi
+            Path: /recipes/{recipe_id}
+            Method: GET
+
   CreateRecipeFunction:
     Type: AWS::Serverless::Function
     Properties:
