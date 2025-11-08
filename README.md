@@ -18,6 +18,7 @@ graph TB
 
     subgraph AWS["AWS Cloud (ap-northeast-1)"]
         APIGW[API Gateway<br/>HTTP API]
+        LambdaLayer[Lambda Layer<br/>共通ライブラリ]
 
         subgraph Lambda["Lambda Functions (Python 3.12)"]
             SuggestMenu[献立提案<br/>SuggestMenuFunction]
@@ -40,6 +41,11 @@ graph TB
     APIGW -->|GET /recipes| GetRecipes
     APIGW -->|POST /recipes| CreateRecipe
     APIGW -->|GET/POST /history| SaveHistory
+
+    LambdaLayer --> SuggestMenu
+    LambdaLayer --> GetRecipes
+    LambdaLayer --> CreateRecipe
+    LambdaLayer --> SaveHistory
 
     SuggestMenu -->|全レシピ取得| RecipesDB
     SuggestMenu -->|過去の履歴取得| HistoryDB
@@ -183,6 +189,7 @@ erDiagram
 | コンポーネント | 役割 | 主要機能 |
 |---------------|------|---------|
 | **API Gateway** | HTTPエンドポイント提供 | ルーティング、CORS設定 |
+| **Lambda Layer** | 共通コードの提供 | レスポンス整形、AWSクライアント初期化など |
 | **SuggestMenuFunction** | AI献立提案 | レシピ取得、履歴分析、Bedrock連携 |
 | **GetRecipesFunction** | レシピ参照 | カテゴリフィルタ、一覧取得 |
 | **CreateRecipeFunction** | レシピ登録 | バリデーション、ID生成 |
@@ -206,6 +213,10 @@ kondate-planner/
 ├── template.yaml          # SAMテンプレート
 ├── samconfig.toml         # デプロイ設定
 ├── src/
+│   ├── layers/            # 共通Lambda Layer
+│   │   └── common/
+│   │       └── python/
+│   │           └── utils.py
 │   ├── suggest_menu/      # 献立提案Lambda
 │   │   ├── app.py
 │   │   └── requirements.txt
