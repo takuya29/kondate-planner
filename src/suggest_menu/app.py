@@ -151,7 +151,13 @@ def call_bedrock(prompt):
     elif '```' in content:
         content = content.split('```')[1].split('```')[0].strip()
 
-    return json.loads(content)
+    # JSON parsing with error handling
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as e:
+        print(f"JSON parsing error: {str(e)}")
+        print(f"Raw content from Bedrock: {content}")
+        raise ValueError(f"Bedrock returned invalid JSON: {str(e)}")
 
 
 def lambda_handler(event, context):
