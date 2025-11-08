@@ -1,9 +1,14 @@
 import json
 import os
+import sys
 import boto3
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
+
+# Add parent directory to path to import common utilities
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from common.validation import safe_int_conversion
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -123,7 +128,26 @@ def save_history(event):
 def get_history(event):
     """献立履歴を取得（GET）"""
     query_params = event.get('queryStringParameters', {}) or {}
-    days = int(query_params.get('days', 30))  # デフォルト30日分
+
+    try:
+        days = safe_int_conversion(
+            query_params.get('days'),
+            'days',
+            min_value=1,
+            max_value=365,
+            default=30
+        )
+    except ValueError as e:
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'error': str(e)
+            }, ensure_ascii=False)
+        }
 
     table = dynamodb.Table(HISTORY_TABLE)
     history_list = []
