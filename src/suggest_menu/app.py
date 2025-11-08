@@ -160,8 +160,7 @@ def call_bedrock(prompt):
     try:
         return json.loads(content)
     except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error: {str(e)}")
-        logger.error(f"Raw content from Bedrock: {content}")
+        logger.error(f"JSON parsing error: {str(e)}, content length: {len(content)} characters")
         raise ValueError(f"Bedrock returned invalid JSON: {str(e)}")
 
 
