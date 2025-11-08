@@ -24,6 +24,15 @@ def decimal_to_float(obj):
     return obj
 
 
+def validate_date_format(date_string):
+    """日付フォーマット(YYYY-MM-DD)の妥当性を検証"""
+    try:
+        datetime.strptime(date_string, '%Y-%m-%d')
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
 def save_history(event):
     """献立履歴を保存（POST）"""
     body = json.loads(event.get('body', '{}'))
@@ -42,6 +51,19 @@ def save_history(event):
                     'error': f'{field}は必須項目です'
                 }, ensure_ascii=False)
             }
+
+    # 日付フォーマットのバリデーション
+    if not validate_date_format(body.get('date')):
+        return {
+            'statusCode': 400,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            'body': json.dumps({
+                'error': '日付は YYYY-MM-DD 形式で指定してください（例: 2024-01-15）'
+            }, ensure_ascii=False)
+        }
 
     # meals構造のバリデーション
     for meal_type in ['breakfast', 'lunch', 'dinner']:
