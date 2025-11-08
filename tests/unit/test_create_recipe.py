@@ -3,7 +3,7 @@
 import json
 import pytest
 from unittest.mock import Mock, patch
-from moto import mock_dynamodb
+from moto import mock_aws
 import sys
 import os
 
@@ -17,7 +17,7 @@ from app import lambda_handler
 class TestCreateRecipe:
     """Test suite for create_recipe Lambda function."""
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_success(self, lambda_context):
         """Test successful recipe creation."""
         event = {
@@ -43,7 +43,7 @@ class TestCreateRecipe:
         assert body["recipe"]["category"] == "メイン"
         assert body["recipe"]["cooking_time"] == 30
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_minimal_fields(self, lambda_context):
         """Test recipe creation with only required fields."""
         event = {"body": json.dumps({"name": "シンプルレシピ"})}
@@ -95,7 +95,7 @@ class TestCreateRecipe:
 
         assert response["statusCode"] == 400
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_with_custom_id(self, lambda_context):
         """Test creating recipe with custom recipe_id."""
         custom_id = "recipe_custom_123"
@@ -109,7 +109,7 @@ class TestCreateRecipe:
         body = json.loads(response["body"])
         assert body["recipe"]["recipe_id"] == custom_id
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_auto_generated_id(self, lambda_context):
         """Test that recipe_id is auto-generated if not provided."""
         event = {"body": json.dumps({"name": "自動IDレシピ"})}
@@ -121,7 +121,7 @@ class TestCreateRecipe:
         assert "recipe_id" in body["recipe"]
         assert body["recipe"]["recipe_id"].startswith("recipe_")
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_timestamps(self, lambda_context):
         """Test that timestamps are added."""
         event = {"body": json.dumps({"name": "タイムスタンプテスト"})}
@@ -133,7 +133,7 @@ class TestCreateRecipe:
         assert "created_at" in body["recipe"]
         assert "updated_at" in body["recipe"]
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_cors_headers(self, lambda_context):
         """Test that CORS headers are present."""
         event = {"body": json.dumps({"name": "CORSテスト"})}
@@ -145,7 +145,7 @@ class TestCreateRecipe:
         assert response["headers"]["Access-Control-Allow-Origin"] == "*"
         assert response["headers"]["Content-Type"] == "application/json"
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_large_payload(self, lambda_context):
         """Test creating recipe with large payload."""
         event = {
@@ -181,7 +181,7 @@ class TestCreateRecipe:
             body = json.loads(response["body"])
             assert "error" in body
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_empty_arrays(self, lambda_context):
         """Test that empty arrays are handled correctly."""
         event = {
@@ -195,7 +195,7 @@ class TestCreateRecipe:
         assert body["recipe"]["ingredients"] == []
         assert body["recipe"]["tags"] == []
 
-    @mock_dynamodb
+    @mock_aws
     def test_create_recipe_special_characters(self, lambda_context):
         """Test recipe creation with special characters."""
         event = {

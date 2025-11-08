@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from moto import mock_dynamodb
+from moto import mock_aws
 from datetime import datetime
 import sys
 import os
@@ -17,7 +17,7 @@ from app import lambda_handler, validate_date_format, safe_int_conversion
 class TestSaveHistory:
     """Test suite for save_history Lambda function (POST)."""
 
-    @mock_dynamodb
+    @mock_aws
     def test_save_history_success(self, lambda_context, mock_dynamodb_history_table):
         """Test successful history save."""
         event = {
@@ -42,7 +42,7 @@ class TestSaveHistory:
         assert "history" in body
         assert body["history"]["date"] == "2025-11-08"
 
-    @mock_dynamodb
+    @mock_aws
     def test_save_history_with_notes(self, lambda_context, mock_dynamodb_history_table):
         """Test saving history with notes."""
         event = {
@@ -192,7 +192,7 @@ class TestSaveHistory:
 
         assert response["statusCode"] == 400
 
-    @mock_dynamodb
+    @mock_aws
     def test_save_history_multiple_meals(
         self, lambda_context, mock_dynamodb_history_table
     ):
@@ -233,7 +233,7 @@ class TestSaveHistory:
 class TestGetHistory:
     """Test suite for save_history Lambda function (GET)."""
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_history_success(self, lambda_context, mock_dynamodb_history_table):
         """Test successful history retrieval."""
         # Add some history data
@@ -260,7 +260,7 @@ class TestGetHistory:
         assert "history" in body
         assert "count" in body
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_history_with_days_param(
         self, lambda_context, mock_dynamodb_history_table
     ):

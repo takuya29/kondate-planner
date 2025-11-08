@@ -3,7 +3,7 @@
 import json
 import pytest
 from unittest.mock import Mock, patch
-from moto import mock_dynamodb
+from moto import mock_aws
 from decimal import Decimal
 import sys
 import os
@@ -18,7 +18,7 @@ from app import lambda_handler, decimal_to_float
 class TestGetRecipes:
     """Test suite for get_recipes Lambda function."""
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_success(self, lambda_context, mock_dynamodb_recipes_table):
         """Test successful retrieval of all recipes."""
         # Add sample recipes to table
@@ -39,7 +39,7 @@ class TestGetRecipes:
         assert "count" in body
         assert body["count"] == 2
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_empty_table(self, lambda_context, mock_dynamodb_recipes_table):
         """Test getting recipes from empty table."""
         event = {"queryStringParameters": None}
@@ -51,7 +51,7 @@ class TestGetRecipes:
         assert body["recipes"] == []
         assert body["count"] == 0
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_with_category_filter(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -77,7 +77,7 @@ class TestGetRecipes:
         for recipe in body["recipes"]:
             assert recipe["category"] == "主食"
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_no_match_category(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -95,7 +95,7 @@ class TestGetRecipes:
         assert body["count"] == 0
         assert body["recipes"] == []
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_sorted_by_name(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -132,7 +132,7 @@ class TestGetRecipes:
         names = [r["name"] for r in body["recipes"]]
         assert names == sorted(names)
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_cors_headers(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -160,7 +160,7 @@ class TestGetRecipes:
             body = json.loads(response["body"])
             assert "error" in body
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_null_query_params(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -204,7 +204,7 @@ class TestGetRecipes:
         assert decimal_to_float("string") == "string"
         assert decimal_to_float(123) == 123
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_with_decimal_fields(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -227,7 +227,7 @@ class TestGetRecipes:
         # Ensure no Decimal objects in JSON (would cause serialization error)
         assert isinstance(body["recipes"][0]["cooking_time"], int)
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_missing_optional_fields(
         self, lambda_context, mock_dynamodb_recipes_table
     ):
@@ -249,7 +249,7 @@ class TestGetRecipes:
         assert body["count"] == 1
         assert body["recipes"][0]["name"] == "ミニマルレシピ"
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recipes_empty_category_filter(
         self, lambda_context, mock_dynamodb_recipes_table
     ):

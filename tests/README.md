@@ -96,9 +96,9 @@ pytest --cov=src --cov-report=term
 We use `moto` to mock DynamoDB:
 
 ```python
-from moto import mock_dynamodb
+from moto import mock_aws
 
-@mock_dynamodb
+@mock_aws
 def test_example(mock_dynamodb_recipes_table):
     # Test code here
     pass
@@ -151,10 +151,10 @@ def test_my_function(lambda_context):
 
 ```python
 import pytest
-from moto import mock_dynamodb
+from moto import mock_aws
 
 @pytest.mark.integration
-@mock_dynamodb
+@mock_aws
 def test_workflow(lambda_context, mock_dynamodb_recipes_table):
     # Test multiple operations together
     pass
@@ -180,7 +180,7 @@ pip install -r requirements-dev.txt
 
 ### DynamoDB Connection Errors
 
-Unit tests use mocked DynamoDB, so no real AWS connection is needed. If you see connection errors, ensure you're using the `@mock_dynamodb` decorator and the appropriate fixtures.
+Unit tests use mocked DynamoDB, so no real AWS connection is needed. If you see connection errors, ensure you're using the `@mock_aws` decorator and the appropriate fixtures.
 
 ### Coverage Not Showing
 

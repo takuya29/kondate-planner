@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from moto import mock_dynamodb
+from moto import mock_aws
 from datetime import datetime
 import sys
 import os
@@ -18,7 +18,7 @@ from src.save_history.app import lambda_handler as save_history_handler
 
 
 @pytest.mark.integration
-@mock_dynamodb
+@mock_aws
 class TestRecipeWorkflow:
     """Integration tests for full recipe workflow."""
 
@@ -86,7 +86,7 @@ class TestRecipeWorkflow:
 
 
 @pytest.mark.integration
-@mock_dynamodb
+@mock_aws
 class TestHistoryWorkflow:
     """Integration tests for history workflow."""
 
@@ -184,7 +184,7 @@ class TestHistoryWorkflow:
 class TestCompleteMenuPlanningWorkflow:
     """Integration test for complete menu planning workflow."""
 
-    @mock_dynamodb
+    @mock_aws
     def test_full_workflow(
         self, lambda_context, mock_dynamodb_recipes_table, mock_dynamodb_history_table
     ):

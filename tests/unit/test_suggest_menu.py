@@ -3,7 +3,7 @@
 import json
 import pytest
 from unittest.mock import Mock, patch
-from moto import mock_dynamodb
+from moto import mock_aws
 import sys
 import os
 
@@ -17,7 +17,7 @@ from app import lambda_handler, build_prompt, get_all_recipes, get_recent_histor
 class TestSuggestMenu:
     """Test suite for suggest_menu Lambda function."""
 
-    @mock_dynamodb
+    @mock_aws
     @patch("app.call_bedrock")
     def test_suggest_menu_success_3_days(
         self, mock_bedrock, lambda_context, mock_dynamodb_recipes_table
@@ -51,7 +51,7 @@ class TestSuggestMenu:
         body = json.loads(response["body"])
         assert "menu_plan" in body
 
-    @mock_dynamodb
+    @mock_aws
     @patch("app.call_bedrock")
     def test_suggest_menu_success_7_days(
         self, mock_bedrock, lambda_context, mock_dynamodb_recipes_table
@@ -99,7 +99,7 @@ class TestSuggestMenu:
             # Should succeed with default
             assert response["statusCode"] == 200
 
-    @mock_dynamodb
+    @mock_aws
     def test_suggest_menu_no_recipes(self, lambda_context, mock_dynamodb_recipes_table):
         """Test that no recipes returns 404."""
         event = {"body": json.dumps({"days": 3})}
@@ -110,7 +110,7 @@ class TestSuggestMenu:
         body = json.loads(response["body"])
         assert "error" in body
 
-    @mock_dynamodb
+    @mock_aws
     @patch("app.call_bedrock")
     def test_suggest_menu_bedrock_error(
         self, mock_bedrock, lambda_context, mock_dynamodb_recipes_table
@@ -130,7 +130,7 @@ class TestSuggestMenu:
         body = json.loads(response["body"])
         assert "error" in body
 
-    @mock_dynamodb
+    @mock_aws
     @patch("app.call_bedrock")
     def test_suggest_menu_invalid_bedrock_json(
         self, mock_bedrock, lambda_context, mock_dynamodb_recipes_table
@@ -241,7 +241,7 @@ class TestBuildPrompt:
 class TestHelperFunctions:
     """Test suite for helper functions."""
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_all_recipes(self, mock_dynamodb_recipes_table):
         """Test getting all recipes."""
         mock_dynamodb_recipes_table.put_item(
@@ -253,14 +253,14 @@ class TestHelperFunctions:
         assert len(recipes) == 1
         assert recipes[0]["recipe_id"] == "recipe_001"
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_all_recipes_empty(self, mock_dynamodb_recipes_table):
         """Test getting recipes from empty table."""
         recipes = get_all_recipes()
 
         assert recipes == []
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recent_history(self, mock_dynamodb_history_table):
         """Test getting recent history."""
         from datetime import datetime
@@ -275,7 +275,7 @@ class TestHelperFunctions:
         # Should include today's history
         assert len(history) >= 0
 
-    @mock_dynamodb
+    @mock_aws
     def test_get_recent_history_custom_days(self, mock_dynamodb_history_table):
         """Test getting history with custom days parameter."""
         history = get_recent_history(days=7)

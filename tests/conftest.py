@@ -2,7 +2,7 @@
 
 import os
 import pytest
-from mock_aws import mock_dynamodb
+from moto import mock_aws
 import boto3
 
 
@@ -19,7 +19,7 @@ def set_test_env():
 @pytest.fixture
 def mock_dynamodb_recipes_table():
     """Create a mock DynamoDB recipes table."""
-    with mock_dynamodb():
+    with mock_aws():
         dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
 
         table = dynamodb.create_table(
@@ -35,7 +35,7 @@ def mock_dynamodb_recipes_table():
 @pytest.fixture
 def mock_dynamodb_history_table():
     """Create a mock DynamoDB history table."""
-    with mock_dynamodb():
+    with mock_aws():
         dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
 
         table = dynamodb.create_table(
