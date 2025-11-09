@@ -3,7 +3,7 @@ import logging
 import json
 from datetime import datetime, timedelta
 
-from utils import dynamodb, decimal_to_float
+from utils import get_dynamodb, decimal_to_float
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ def lambda_handler(event, context):
 
         logger.info(f"Getting menu history for past {days} days")
 
-        table = dynamodb.Table(HISTORY_TABLE)
+        table = get_dynamodb().Table(HISTORY_TABLE)
         history_list = []
 
         # Fetch history for the specified number of days

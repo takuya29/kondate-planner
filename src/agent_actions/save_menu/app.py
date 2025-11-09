@@ -3,7 +3,7 @@ import logging
 import json
 from datetime import datetime
 
-from utils import dynamodb, decimal_to_float, parse_bedrock_parameter
+from utils import get_dynamodb, decimal_to_float, parse_bedrock_parameter
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ def lambda_handler(event, context):
         logger.info(f"Saving menu history for date: {date}")
 
         # Check for existing entry
-        table = dynamodb.Table(HISTORY_TABLE)
+        table = get_dynamodb().Table(HISTORY_TABLE)
         existing_response = table.get_item(Key={"date": date})
         existing_item = existing_response.get("Item")
 

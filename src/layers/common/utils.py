@@ -3,9 +3,25 @@ import re
 import boto3
 from decimal import Decimal
 
-# AWS Clients (initialized once)
-dynamodb = boto3.resource("dynamodb")
-bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
+# AWS Clients (lazy-initialized to avoid import-time errors in test environments)
+_dynamodb = None
+_bedrock = None
+
+
+def get_dynamodb():
+    """Get or create DynamoDB resource."""
+    global _dynamodb
+    if _dynamodb is None:
+        _dynamodb = boto3.resource("dynamodb")
+    return _dynamodb
+
+
+def get_bedrock():
+    """Get or create Bedrock client."""
+    global _bedrock
+    if _bedrock is None:
+        _bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
+    return _bedrock
 
 
 def create_response(status_code, body, is_json=True):

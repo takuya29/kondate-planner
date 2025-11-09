@@ -85,4 +85,4 @@ jobs:
 
       - name: Run MyPy (type checking)
         run: |
-          mypy src/
+          mypy src/ --explicit-package-bases
