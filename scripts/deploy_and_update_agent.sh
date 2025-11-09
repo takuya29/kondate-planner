@@ -11,9 +11,18 @@ echo "=========================================="
 echo "Deploying Kondate Planner"
 echo "=========================================="
 
-# Step 1: Deploy CloudFormation stack (AutoPrepare will prepare DRAFT automatically)
+# Step 1: Build SAM application
 echo ""
-echo "[1/3] Running sam deploy..."
+echo "[1/4] Running sam build..."
+if ! sam build; then
+  echo "✗ Build failed"
+  exit 1
+fi
+echo "✓ Build completed successfully"
+
+# Step 2: Deploy CloudFormation stack (AutoPrepare will prepare DRAFT automatically)
+echo ""
+echo "[2/4] Running sam deploy..."
 DEPLOY_OUTPUT=$(mktemp)
 AGENT_CHANGED=false
 
@@ -42,9 +51,9 @@ fi
 
 rm -f "$DEPLOY_OUTPUT"
 
-# Step 2: Get Agent ID from CloudFormation outputs
+# Step 3: Get Agent ID from CloudFormation outputs
 echo ""
-echo "[2/3] Getting Agent ID from stack outputs..."
+echo "[3/4] Getting Agent ID from stack outputs..."
 AGENT_ID=$(aws cloudformation describe-stacks \
   --stack-name "$STACK_NAME" \
   --region "$REGION" \
@@ -59,9 +68,9 @@ fi
 echo "Agent ID: $AGENT_ID"
 
 if [ "$AGENT_CHANGED" = true ]; then
-  # Step 3: Update alias (automatically creates new version and points to it)
+  # Step 4: Update alias (automatically creates new version and points to it)
   echo ""
-  echo "[3/3] Updating production alias..."
+  echo "[4/4] Updating production alias..."
   ALIAS_ID=$(aws cloudformation describe-stacks \
     --stack-name "$STACK_NAME" \
     --region "$REGION" \
