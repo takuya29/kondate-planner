@@ -10,13 +10,6 @@ confirm_changeset = false
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 image_repositories = []
 
-# IMPORTANT: Do NOT add Slack credentials here if this is a public repository!
-# Instead, pass them via command line:
-#   sam deploy --parameter-overrides SlackWorkspaceId=XXX SlackChannelId=YYY
-#
-# For local/private use only, you can uncomment and set:
-# parameter_overrides = "SlackWorkspaceId=YOUR_WORKSPACE_ID SlackChannelId=YOUR_CHANNEL_ID"
-
 [default.build]
 [default.build.parameters]
 parallel = true

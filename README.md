@@ -152,13 +152,7 @@ sam build
 sam deploy --parameter-overrides \
   SlackWorkspaceId=YOUR_WORKSPACE_ID \
   SlackChannelId=YOUR_CHANNEL_ID
-
-# または、samconfig.toml に追加してから：
-# parameter_overrides = "SlackWorkspaceId=XXX SlackChannelId=YYY"
-sam deploy
 ```
-
-**注意**: 公開リポジトリの場合、Slack IDを `samconfig.toml` にコミットしないでください。コマンドラインで指定するか、AWS Systems Manager Parameter Store を使用してください。
 
 ### 3. サンプルデータの投入
 

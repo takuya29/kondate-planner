@@ -298,20 +298,10 @@ The Amazon Q Developer Slack channel is now managed via CloudFormation. Here's h
 Deploy the stack with your Slack credentials:
 
 ```bash
-# Option 1: Via command line
 sam deploy --parameter-overrides \
   SlackWorkspaceId=YOUR_WORKSPACE_ID \
   SlackChannelId=YOUR_CHANNEL_ID
-
-# Option 2: Update samconfig.toml (DO NOT commit this file if public repo)
-# Add to [default.deploy.parameters]:
-# parameter_overrides = "SlackWorkspaceId=YOUR_WORKSPACE_ID SlackChannelId=YOUR_CHANNEL_ID"
 ```
-
-**Security Note**: The Slack IDs are sensitive. If using a public repository:
-- Use Option 1 (command line) for deployments
-- Or store IDs in AWS Systems Manager Parameter Store and reference them
-- Never commit actual IDs to `samconfig.toml` in a public repo
 
 ### What Gets Created
 
