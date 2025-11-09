@@ -547,24 +547,3 @@ Outputs:
   InvokeBedrockAgentPolicyArn:
     Description: "Bedrock Agent invocation policy ARN (used by both role and guardrail)"
     Value: !Ref InvokeBedrockAgentPolicy
-
-  # ==================== Setup Instructions ====================
-  NextSteps:
-    Description: "Post-deployment setup instructions"
-    Value: |
-      Deployment complete! Your Bedrock Agent and Developer Q Slack channel are ready.
-
-      1. Test the agent in Slack:
-         - Go to your configured Slack channel
-         - Type: @AWS 3日分の献立を提案して
-
-      2. Test in Bedrock Console (optional):
-         - Navigate to Amazon Bedrock > Agents
-         - Select kondate-planner-agent
-         - Use the built-in test interface
-
-      3. Seed sample data (if not done already):
-         python scripts/seed_data.py --recipes 20 --history 30
-
-      Note: If you need to update Slack workspace/channel IDs later,
-      use `sam deploy` with --parameter-overrides
