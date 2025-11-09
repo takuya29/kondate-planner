@@ -1,4 +1,5 @@
 """Unit tests for save_menu action (src/agent_actions/save_menu/app.py)."""
+
 import json
 
 import pytest
@@ -7,10 +8,10 @@ import pytest
 class TestSaveMenuAction:
     """Test cases for save_menu Lambda handler."""
 
-    def test_save_menu_success(self, mock_dynamodb_tables, bedrock_agent_event):
+    def test_save_menu_success(
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
+    ):
         """Test successfully saving a new menu."""
-        from app import lambda_handler
-
         event = bedrock_agent_event.copy()
         event["actionGroup"] = "SaveMenu"
         event["apiPath"] = "/menu"
@@ -29,10 +30,16 @@ class TestSaveMenuAction:
                                         {"recipe_id": "recipe_001", "name": "味噌汁"}
                                     ],
                                     "lunch": [
-                                        {"recipe_id": "recipe_004", "name": "カレーライス"}
+                                        {
+                                            "recipe_id": "recipe_004",
+                                            "name": "カレーライス",
+                                        }
                                     ],
                                     "dinner": [
-                                        {"recipe_id": "recipe_002", "name": "鮭の塩焼き"}
+                                        {
+                                            "recipe_id": "recipe_002",
+                                            "name": "鮭の塩焼き",
+                                        }
                                     ],
                                 }
                             ),
@@ -42,7 +49,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         assert response["messageVersion"] == "1.0"
         assert response["response"]["httpStatusCode"] == 200
@@ -53,10 +60,10 @@ class TestSaveMenuAction:
         assert body["date"] == "2025-11-10"
         assert "successfully" in body["message"].lower()
 
-    def test_save_menu_with_notes(self, mock_dynamodb_tables, bedrock_agent_event):
+    def test_save_menu_with_notes(
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
+    ):
         """Test saving a menu with notes."""
-        from app import lambda_handler
-
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
             "content": {
@@ -84,15 +91,13 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
         assert response["response"]["httpStatusCode"] == 200
 
     def test_save_menu_duplicate_without_overwrite(
-        self, mock_dynamodb_tables, bedrock_agent_event
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
         """Test saving a menu for a date that already exists (without overwrite)."""
-        from app import lambda_handler
-
         # Try to save menu for 2025-11-08 which already exists in fixtures
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
@@ -116,7 +121,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         # Should return 409 conflict
         assert response["response"]["httpStatusCode"] == 409
@@ -127,11 +132,9 @@ class TestSaveMenuAction:
         assert "existing_menu" in body
 
     def test_save_menu_duplicate_with_overwrite(
-        self, mock_dynamodb_tables, bedrock_agent_event
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
         """Test overwriting an existing menu."""
-        from app import lambda_handler
-
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
             "content": {
@@ -155,7 +158,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         assert response["response"]["httpStatusCode"] == 200
         body_str = response["response"]["responseBody"]["application/json"]["body"]
@@ -164,11 +167,9 @@ class TestSaveMenuAction:
         assert body["overwritten"] is True
 
     def test_save_menu_invalid_date_format(
-        self, mock_dynamodb_tables, bedrock_agent_event
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
         """Test validation error with invalid date format."""
-        from app import lambda_handler
-
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
             "content": {
@@ -185,7 +186,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         assert response["response"]["httpStatusCode"] == 400
         body_str = response["response"]["responseBody"]["application/json"]["body"]
@@ -193,10 +194,10 @@ class TestSaveMenuAction:
         assert body["success"] is False
         assert "YYYY-MM-DD" in body["error"]
 
-    def test_save_menu_missing_date(self, mock_dynamodb_tables, bedrock_agent_event):
+    def test_save_menu_missing_date(
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
+    ):
         """Test validation error when date is missing."""
-        from app import lambda_handler
-
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
             "content": {
@@ -212,7 +213,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         assert response["response"]["httpStatusCode"] == 400
         body_str = response["response"]["responseBody"]["application/json"]["body"]
@@ -220,10 +221,10 @@ class TestSaveMenuAction:
         assert body["success"] is False
         assert "date is required" in body["error"]
 
-    def test_save_menu_missing_meals(self, mock_dynamodb_tables, bedrock_agent_event):
+    def test_save_menu_missing_meals(
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
+    ):
         """Test validation error when meals is missing."""
-        from app import lambda_handler
-
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
             "content": {
@@ -235,7 +236,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         assert response["response"]["httpStatusCode"] == 400
         body_str = response["response"]["responseBody"]["application/json"]["body"]
@@ -244,11 +245,9 @@ class TestSaveMenuAction:
         assert "meals is required" in body["error"]
 
     def test_save_menu_bedrock_python_dict_format(
-        self, mock_dynamodb_tables, bedrock_agent_event
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
         """Test parsing meals parameter in Bedrock Python dict format."""
-        from app import lambda_handler
-
         # Simulate Bedrock Agent sending Python dict format instead of JSON
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
@@ -266,7 +265,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
 
         # Should successfully parse and save
         assert response["response"]["httpStatusCode"] == 200
@@ -275,10 +274,9 @@ class TestSaveMenuAction:
         assert body["success"] is True
 
     def test_save_menu_recipe_id_extraction(
-        self, mock_dynamodb_tables, bedrock_agent_event
+        self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
         """Test that recipe_ids are extracted into flat list."""
-        from app import lambda_handler
         import boto3
 
         event = bedrock_agent_event.copy()
@@ -310,7 +308,7 @@ class TestSaveMenuAction:
             }
         }
 
-        response = lambda_handler(event, None)
+        response = save_menu_handler(event, None)
         assert response["response"]["httpStatusCode"] == 200
 
         # Verify the saved item has recipe_ids in flat list
@@ -321,14 +319,14 @@ class TestSaveMenuAction:
         assert "recipe_001" in saved_item["recipes"]
         assert "recipe_004" in saved_item["recipes"]
 
-    def test_save_menu_error_handling(self, mock_env_vars, bedrock_agent_event):
+    def test_save_menu_error_handling(
+        self, mock_env_vars, bedrock_agent_event, save_menu_handler
+    ):
         """Test error handling when DynamoDB operation fails."""
         from moto import mock_aws
 
         with mock_aws():
             # Don't create the table
-            from app import lambda_handler
-
             event = bedrock_agent_event.copy()
             event["requestBody"] = {
                 "content": {
@@ -345,7 +343,7 @@ class TestSaveMenuAction:
                 }
             }
 
-            response = lambda_handler(event, None)
+            response = save_menu_handler(event, None)
 
             # Should return error response
             assert response["response"]["httpStatusCode"] == 500

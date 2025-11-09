@@ -73,11 +73,9 @@ def lambda_handler(event, context):
                 "httpMethod": event.get("httpMethod"),
                 "httpStatusCode": 200,
                 "responseBody": {
-                    "application/json": {
-                        "body": json.dumps({"recipes": recipes})
-                    }
-                }
-            }
+                    "application/json": {"body": json.dumps({"recipes": recipes})}
+                },
+            },
         }
 
     except Exception as e:
@@ -94,6 +92,6 @@ def lambda_handler(event, context):
                     "application/json": {
                         "body": json.dumps({"error": str(e), "recipes": []})
                     }
-                }
-            }
+                },
+            },
         }

@@ -1,8 +1,7 @@
 """Integration tests for DynamoDB interactions across all actions."""
+
 import json
 from datetime import datetime
-
-import pytest
 
 
 class TestDynamoDBIntegration:
@@ -179,7 +178,11 @@ class TestDynamoDBIntegration:
                             "name": "meals",
                             "type": "object",
                             "value": json.dumps(
-                                {"breakfast": [{"recipe_id": "new_001", "name": "新しい"}]}
+                                {
+                                    "breakfast": [
+                                        {"recipe_id": "new_001", "name": "新しい"}
+                                    ]
+                                }
                             ),
                         },
                     ]
@@ -212,7 +215,11 @@ class TestDynamoDBIntegration:
             "content": {
                 "application/json": {
                     "properties": [
-                        {"name": "date", "type": "string", "value": "2025-11-16"},
+                        {
+                            "name": "date",
+                            "type": "string",
+                            "value": datetime.now().strftime("%Y-%m-%d"),
+                        },
                         {
                             "name": "meals",
                             "type": "object",
@@ -244,8 +251,7 @@ class TestDynamoDBIntegration:
         )
 
         # Find our saved menu
-        menu = next(
-            (h for h in history_body["history"] if h["date"] == "2025-11-16"), None
-        )
+        today = datetime.now().strftime("%Y-%m-%d")
+        menu = next((h for h in history_body["history"] if h["date"] == today), None)
         assert menu is not None
         assert menu["meals"]["lunch"][0]["recipe_id"] == "recipe_001"

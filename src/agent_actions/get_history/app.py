@@ -95,11 +95,9 @@ def lambda_handler(event, context):
                 "httpMethod": event.get("httpMethod"),
                 "httpStatusCode": 200,
                 "responseBody": {
-                    "application/json": {
-                        "body": json.dumps({"history": history_list})
-                    }
-                }
-            }
+                    "application/json": {"body": json.dumps({"history": history_list})}
+                },
+            },
         }
 
     except ValueError as e:
@@ -115,8 +113,8 @@ def lambda_handler(event, context):
                     "application/json": {
                         "body": json.dumps({"error": str(e), "history": []})
                     }
-                }
-            }
+                },
+            },
         }
     except Exception as e:
         logger.error(f"Error getting history: {str(e)}", exc_info=True)
@@ -131,6 +129,6 @@ def lambda_handler(event, context):
                     "application/json": {
                         "body": json.dumps({"error": str(e), "history": []})
                     }
-                }
-            }
+                },
+            },
         }

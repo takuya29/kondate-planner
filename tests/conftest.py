@@ -1,4 +1,5 @@
 """Shared pytest fixtures for all tests."""
+
 import json
 import os
 import sys
@@ -11,11 +12,41 @@ from moto import mock_aws
 # Add src/layers/common to Python path so tests can import utils
 sys.path.insert(0, str(Path(__file__).parent.parent / "src" / "layers" / "common"))
 
-# Add each action function directory to Python path
-for action in ["get_recipes", "get_history", "save_menu"]:
-    sys.path.insert(
-        0, str(Path(__file__).parent.parent / "src" / "agent_actions" / action)
-    )
+
+# Helper function to import action handlers dynamically
+def import_action_handler(action_name):
+    """Import lambda_handler from specific action directory."""
+    action_path = Path(__file__).parent.parent / "src" / "agent_actions" / action_name
+    sys.path.insert(0, str(action_path))
+    try:
+        import app
+
+        # Force reload to get the correct module
+        import importlib
+
+        importlib.reload(app)
+        return app.lambda_handler
+    finally:
+        # Remove the path after import to avoid conflicts
+        sys.path.remove(str(action_path))
+
+
+@pytest.fixture
+def get_recipes_handler():
+    """Get the get_recipes lambda handler."""
+    return import_action_handler("get_recipes")
+
+
+@pytest.fixture
+def get_history_handler():
+    """Get the get_history lambda handler."""
+    return import_action_handler("get_history")
+
+
+@pytest.fixture
+def save_menu_handler():
+    """Get the save_menu lambda handler."""
+    return import_action_handler("save_menu")
 
 
 @pytest.fixture
@@ -66,9 +97,7 @@ def mock_dynamodb_tables(mock_env_vars, sample_recipes, sample_history):
         recipes_table = dynamodb.create_table(
             TableName=mock_env_vars["RECIPES_TABLE"],
             KeySchema=[{"AttributeName": "recipe_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[
-                {"AttributeName": "recipe_id", "AttributeType": "S"}
-            ],
+            AttributeDefinitions=[{"AttributeName": "recipe_id", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST",
         )
 

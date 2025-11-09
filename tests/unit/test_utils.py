@@ -1,4 +1,5 @@
 """Unit tests for shared utilities (src/layers/common/utils.py)."""
+
 import json
 from decimal import Decimal
 
