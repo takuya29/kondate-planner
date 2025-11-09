@@ -23,7 +23,7 @@ Action Lambdas (get_recipes, get_history, save_menu)
 DynamoDB (recipes, menu-history)
 ```
 
-**Key Difference from Previous Architecture**: No REST API or custom Slack handler. AWS Chatbot handles all Slack integration, and the Bedrock Agent orchestrates Lambda actions via natural language understanding.
+AWS Chatbot handles all Slack integration, and the Bedrock Agent orchestrates Lambda actions via natural language understanding.
 
 ## Build and Development Commands
 
@@ -210,15 +210,17 @@ Provides common utilities to all action functions:
 
 **Note**: The layer structure is `src/layers/common/utils.py` (not nested in a `python/` subdirectory). SAM automatically packages this correctly for Lambda layer deployment.
 
-### OpenAPI Schemas (`src/schemas/`)
+### OpenAPI Schemas
 
-Define how the Bedrock Agent calls each Lambda action:
+**Current Implementation**: OpenAPI schemas are **embedded inline** in `template.yaml` (lines 159-365) as part of each action group definition. This allows CloudFormation to manage everything in a single file.
 
-- **`get-recipes.yaml`**: Defines `get_recipes` action
-- **`get-history.yaml`**: Defines `get_history` action
-- **`save-menu.yaml`**: Defines `save_menu` action
+**Legacy Schema Files** (`src/schemas/`): For reference only
+- `get-recipes.yaml` - Reference schema for get_recipes action
+- `get-history.yaml` - Reference schema for get_history action
+- `save-menu.yaml` - Reference schema for save_menu action
+- `history-management.yaml` - **Unused** legacy combined schema
 
-**Important**: These schemas are the "instruction manual" for the agent. The `description` fields are critical - the agent reads them to understand when to use each action.
+**Important**: The schemas in `src/schemas/` are NOT used by the deployed agent. They serve as reference documentation only. All active schemas are defined inline in `template.yaml`. The `description` fields in the inline schemas are critical - the agent reads them to understand when to use each action.
 
 ### DynamoDB Schema
 
@@ -358,6 +360,17 @@ CloudFormation will update the channel configuration without recreating other re
 
 ## Critical Implementation Details
 
+### SaveMenuAction - Python Format Conversion
+
+The `save_menu` action includes special handling for Bedrock Agent's parameter format (`save_menu/app.py` lines 73-111):
+
+**Issue**: Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
+```
+{lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
+```
+
+**Solution**: The Lambda function includes regex-based conversion logic to transform Python format to valid JSON. This conversion is transparent to the user but critical for reliability when saving menus.
+
 ### Amazon Bedrock Permissions
 
 **Model Access**: Claude Sonnet 4.5 via Inference Profile (cross-region)
@@ -458,6 +471,7 @@ echo '{
 5. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
 6. **Explicit Confirmation**: Agent should NEVER call `save_menu` without user approval - this is critical for UX
 7. **Public Repository**: Never commit actual Slack IDs to `samconfig.toml` if using a public repo
+8. **Recipe Categories**: Current seed data uses inconsistent categories (`メイン`, `副菜`, `汁物`, `朝食`). Consider standardizing to match agent instructions if creating custom recipes
 
 ## Deployment Checklist
 

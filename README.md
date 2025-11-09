@@ -62,7 +62,7 @@ graph TB
     Chatbot -->|応答| User
 ```
 
-**旧アーキテクチャとの違い**: REST APIやカスタムSlackハンドラーは不要。AWS ChatbotがSlack統合を担当し、Bedrock Agentが自然言語理解とLambdaアクションの実行を統括します。
+AWS ChatbotがSlack統合を担当し、Bedrock Agentが自然言語理解とLambdaアクションの実行を統括します。
 
 ### 対話フロー例
 
@@ -119,7 +119,7 @@ sequenceDiagram
 
 ```
 kondate-planner/
-├── template.yaml              # SAMテンプレート
+├── template.yaml              # SAMテンプレート（OpenAPIスキーマ含む）
 ├── samconfig.toml             # デプロイ設定
 ├── AGENTS.md                  # アーキテクチャドキュメント（詳細）
 ├── CLAUDE.md -> AGENTS.md     # シンボリックリンク
@@ -137,7 +137,7 @@ kondate-planner/
 │   ├── layers/                # 共通Lambda Layer
 │   │   └── common/
 │   │       └── utils.py
-│   └── schemas/               # OpenAPIスキーマ
+│   └── schemas/               # OpenAPIスキーマ（参照用、実際はtemplate.yamlに埋め込み）
 │       ├── get-recipes.yaml
 │       ├── get-history.yaml
 │       └── save-menu.yaml
@@ -163,133 +163,78 @@ AWSコンソールで以下を実行：
 2. 「Model access」に移動
 3. 「Anthropic Claude Sonnet 4.5」のアクセスを有効化
 
-### 2. ビルドとデプロイ
+### 2. Slackワークスペースの認証（初回のみ）
+
+**重要**: デプロイ前に、Slackワークスペースを AWS Chatbot に認証する必要があります：
+
+1. **AWS Chatbot Console** → **Configure new client**
+2. **Slack** を選択
+3. **Configure** をクリックしてSlackワークスペースを認証
+4. 認証後、**Slack Workspace ID** をメモ（コンソールに表示されます）
+5. **Slack Channel ID** を取得：
+   - Slackでチャンネル名を右クリック
+   - **Copy Link** を選択
+   - URLの最後の部分がチャンネルID（例: `C12345ABCDE`）
+
+### 3. ビルドとデプロイ
 
 ```bash
 # ビルド
 sam build
 
-# デプロイ（初回）
-sam deploy --guided
+# デプロイ（Slack情報を含む）
+sam deploy --parameter-overrides \
+  SlackWorkspaceId=YOUR_WORKSPACE_ID \
+  SlackChannelId=YOUR_CHANNEL_ID
 
-# 2回目以降
+# または、samconfig.toml に追加してから：
+# parameter_overrides = "SlackWorkspaceId=XXX SlackChannelId=YYY"
 sam deploy
 ```
 
-### 3. OpenAPIスキーマのアップロード
+**注意**: 公開リポジトリの場合、Slack IDを `samconfig.toml` にコミットしないでください。コマンドラインで指定するか、AWS Systems Manager Parameter Store を使用してください。
 
-デプロイ後、スキーマファイルをS3にアップロードします：
+### 4. デプロイの確認
+
+デプロイが完了すると、以下が自動的に作成されます：
+
+- ✅ Bedrock Agent（`kondate-planner-agent`）
+- ✅ Agent Alias（`production`）
+- ✅ 3つのAction Lambda関数
+- ✅ DynamoDBテーブル（recipes、menu-history）
+- ✅ Developer Q Slack Channel設定
+- ✅ IAMロールと権限
 
 ```bash
-# スタック出力からバケット名を取得
-BUCKET_NAME=$(aws cloudformation describe-stacks \
-  --stack-name kondate-planner \
-  --query 'Stacks[0].Outputs[?OutputKey==`AgentSchemasBucketName`].OutputValue' \
-  --output text)
-
-# スキーマをアップロード
-aws s3 cp src/schemas/get-recipes.yaml s3://${BUCKET_NAME}/get-recipes.yaml
-aws s3 cp src/schemas/get-history.yaml s3://${BUCKET_NAME}/get-history.yaml
-aws s3 cp src/schemas/save-menu.yaml s3://${BUCKET_NAME}/save-menu.yaml
+# デプロイ確認
+aws cloudformation describe-stacks --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs[?OutputKey==`DeveloperQSlackChannelArn`].OutputValue' --output text
 ```
 
-### 4. Bedrock Agentの作成
+### 5. Bedrockエージェントの確認（オプション）
 
-AWSコンソールでBedrockエージェントを作成します。
+エージェントはCloudFormationで自動作成されますが、コンソールで確認できます：
 
-#### 4-1. エージェントの基本設定
+1. **Amazon Bedrockコンソール** → **Agents**
+2. `kondate-planner-agent` を選択
+3. アクショングループが3つ設定されていることを確認
+4. テストインターフェースで動作確認可能
 
-1. Amazon Bedrockコンソール → Agents → Create agent
-2. **エージェント名**: `kondate-menu-planner`
-3. **説明**: `日本料理の献立計画アシスタント`
-4. **モデル**: `Claude Sonnet 4.5`
-5. **IAMロール**: デプロイ時の出力 `BedrockAgentRoleArn` を使用
+**注意**: エージェント指示を変更する場合は `template.yaml` を編集し、再デプロイしてください。コンソールでの変更は次回デプロイ時に上書きされます。
 
-#### 4-2. エージェント指示の設定
+~~### 4. Bedrock Agentの作成~~
 
-以下をエージェント指示欄に貼り付け：
+~~AWSコンソールでBedrockエージェントを作成します。~~
 
-```
-あなたはバランスの取れた日本食の献立計画を支援する親切なアシスタントです。
+~~#### 4-1. エージェントの基本設定~~
 
-利用可能なレシピと履歴:
-- get_recipes() を呼び出して利用可能なレシピを確認できます。カテゴリでフィルタすることも可能です。
-- get_history() を呼び出して最近の献立（デフォルト30日）を確認できます。レシピの重複を避けるために使用してください。
+~~1. Amazon Bedrockコンソール → Agents → Create agent~~
+~~2. **エージェント名**: `kondate-menu-planner`~~
+~~3. **説明**: `日本料理の献立計画アシスタント`~~
+~~4. **モデル**: `Claude Sonnet 4.5`~~
+~~5. **IAMロール**: デプロイ時の出力 `BedrockAgentRoleArn` を使用~~
 
-献立計画のルール:
-献立を提案する際は以下を守ってください:
-1. 朝食: 1-2品（例: ご飯+味噌汁、トースト+サラダ）
-2. 昼食: 1-3品（バランス食またはお弁当スタイル）
-3. 夕食: 2-3品（主菜+副菜+汁物が一般的）
-4. バリエーション: 連続する日で同じ主要タンパク質を繰り返さない
-5. バランス: 可能な限り毎食に野菜を含める
-6. 調理時間: 短時間レシピ(<30分)と手の込んだレシピをミックス
-
-ワークフロー:
-1. ユーザーが献立提案を求めたら、レシピと最近の履歴を取得
-2. 要求された日数（通常3日または7日）の献立プランを生成
-3. レシピ名とカテゴリを含めて献立を明確に提示
-4. 「この献立で保存しますか？」と尋ねる
-5. ユーザーが明示的に確認した場合のみ save_menu() を呼び出す（はい/保存して/良さそう等）
-6. ユーザーが拒否または変更を求めた場合は、フィードバックに基づいて再生成
-
-トーン:
-- フレンドリーで会話的に
-- ユーザーの言語（日本語または英語）で応答
-- 関連する場合は簡単な調理のヒントや栄養情報を提供
-```
-
-#### 4-3. アクショングループの追加
-
-**アクショングループ1: GetRecipes**
-- 名前: `GetRecipes`
-- 説明: `レシピデータベースの取得`
-- Lambda: `GetRecipesActionFunction` を選択
-- OpenAPIスキーマ: S3から選択
-  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - オブジェクトキー: `get-recipes.yaml`
-
-**アクショングループ2: GetHistory**
-- 名前: `GetHistory`
-- 説明: `献立履歴の取得`
-- Lambda: `GetHistoryActionFunction` を選択
-- OpenAPIスキーマ: S3から選択
-  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - オブジェクトキー: `get-history.yaml`
-
-**アクショングループ3: SaveMenu**
-- 名前: `SaveMenu`
-- 説明: `承認された献立の保存`
-- Lambda: `SaveMenuActionFunction` を選択
-- OpenAPIスキーマ: S3から選択
-  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - オブジェクトキー: `save-menu.yaml`
-
-#### 4-4. エージェントの準備
-
-1. 「Prepare」ボタンをクリック（約2分）
-2. テストコンソールで動作確認:
-   - 「3日分の献立を提案して」
-   - 「最近の献立を見せて」
-3. **Alias**を作成（例: `production`）
-
-### 5. AWS Chatbotの設定
-
-#### 5-1. Slackワークスペースの接続
-
-1. AWS Chatbotコンソールを開く
-2. 「Configure new client」→ **Slack** を選択
-3. Slackワークスペースを認証
-4. チャンネルを選択（例: `#kondate-planner`）
-
-#### 5-2. Bedrock Agent統合
-
-1. チャンネル設定で:
-   - 「Amazon Bedrock Agent」を有効化
-   - エージェント: `kondate-menu-planner` を選択
-   - エイリアス: `production`（または `DRAFT`）を選択
-2. IAMロール権限:
-   - `AmazonBedrockFullAccess` を付与（またはエージェント専用のスコープポリシー）
+~~#### 4-2. エージェント指示の設定~~
 
 ### 6. サンプルデータの投入
 
@@ -301,7 +246,7 @@ pip install boto3
 python scripts/seed_data.py --recipes 20 --history 30
 ```
 
-### 7. Slackでテスト
+### 7. Slackで動作確認
 
 設定したSlackチャンネルで:
 
@@ -437,20 +382,26 @@ Resource:
 
 ## デプロイチェックリスト
 
-新しい環境にデプロイする際:
+新しい環境にデプロイする際（すべて自動化済み）:
 
-- [ ] `sam build && sam deploy --guided` を実行
-- [ ] スタック出力からS3バケット名を確認
-- [ ] OpenAPIスキーマをS3にアップロード
-- [ ] Bedrockコンソールでエージェントを作成（スタック出力のARNを使用）
-- [ ] アクショングループを正しいLambda ARNで追加
-- [ ] エージェントを「Prepare」
-- [ ] Bedrockコンソールでエージェントをテスト
-- [ ] エージェントエイリアス（`production`）を作成
-- [ ] AWS ChatbotでSlackワークスペースを設定
-- [ ] Chatbotをエージェントエイリアスに接続
-- [ ] Slackチャンネルでエンドツーエンドテスト
+### 初回セットアップ
+- [ ] Amazon Bedrockで Claude Sonnet 4.5 のモデルアクセスを有効化
+- [ ] AWS Chatbot ConsoleでSlackワークスペースを認証
+- [ ] Slack Workspace IDとChannel IDを取得
+
+### デプロイ
+- [ ] `sam build` を実行
+- [ ] `sam deploy --parameter-overrides SlackWorkspaceId=XXX SlackChannelId=YYY` を実行
+- [ ] デプロイ完了を確認（すべてのリソースが自動作成される）
+
+### 動作確認
+- [ ] Slackでテスト: `@AWS 3日分の献立を提案して`
+- [ ] （オプション）Bedrockコンソールでエージェントを確認
+
+### データ投入
 - [ ] サンプルデータを投入: `python scripts/seed_data.py --recipes 20 --history 30`
+
+**注意**: Bedrock Agent、アクショングループ、Slack設定はすべてCloudFormationで自動管理されます。手動設定は不要です。
 
 ## 今後の拡張予定
 
