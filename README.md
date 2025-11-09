@@ -217,20 +217,6 @@ aws cloudformation describe-stacks --stack-name kondate-planner \
 
 **注意**: エージェント指示を変更する場合は `template.yaml` を編集し、再デプロイしてください。コンソールでの変更は次回デプロイ時に上書きされます。
 
-~~### 4. Bedrock Agentの作成~~
-
-~~AWSコンソールでBedrockエージェントを作成します。~~
-
-~~#### 4-1. エージェントの基本設定~~
-
-~~1. Amazon Bedrockコンソール → Agents → Create agent~~
-~~2. **エージェント名**: `kondate-menu-planner`~~
-~~3. **説明**: `日本料理の献立計画アシスタント`~~
-~~4. **モデル**: `Claude Sonnet 4.5`~~
-~~5. **IAMロール**: デプロイ時の出力 `BedrockAgentRoleArn` を使用~~
-
-~~#### 4-2. エージェント指示の設定~~
-
 ### 6. サンプルデータの投入
 
 ```bash
