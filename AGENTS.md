@@ -43,25 +43,29 @@ sam deploy
 sam delete
 ```
 
-### Post-Deployment Setup
+### Post-Deployment Verification
 
-After `sam deploy`, you need to:
+After running `sam deploy` with Slack parameters, verify the deployment:
 
-1. **Upload OpenAPI schemas to S3**:
 ```bash
-# Get bucket name from stack outputs
+# Check stack outputs
 aws cloudformation describe-stacks --stack-name kondate-planner \
-  --query 'Stacks[0].Outputs[?OutputKey==`AgentSchemasBucketName`].OutputValue' --output text
+  --query 'Stacks[0].Outputs[?OutputKey==`DeveloperQSlackChannelArn`].OutputValue' --output text
 
-# Upload schemas
-aws s3 cp src/schemas/get-recipes.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/get-recipes.yaml
-aws s3 cp src/schemas/get-history.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/get-history.yaml
-aws s3 cp src/schemas/save-menu.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/save-menu.yaml
+# You should see the ARN of your Slack channel configuration
 ```
 
-2. **Create Bedrock Agent** (see "Bedrock Agent Configuration" section below)
+**What gets automatically created:**
+- ✅ Bedrock Agent with all action groups
+- ✅ Agent alias (`production`)
+- ✅ Developer Q Slack channel configuration
+- ✅ IAM roles with proper permissions
+- ✅ DynamoDB tables
+- ✅ Lambda functions with layers
 
-3. **Configure AWS Chatbot** (see "AWS Chatbot Setup" section below)
+**Next steps:**
+1. Seed sample data (see "Data Management" section below)
+2. Test in Slack (see "AWS Chatbot / Developer Q Setup" section)
 
 ### Local Testing
 
@@ -228,126 +232,108 @@ Define how the Bedrock Agent calls each Lambda action:
 
 ## Bedrock Agent Configuration
 
-After deploying the SAM stack, create the agent manually in the Bedrock console:
+**The Bedrock Agent is now fully managed via CloudFormation!** 🎉
 
-### Step 1: Create Agent
+The `template.yaml` automatically creates:
 
-1. Go to AWS Bedrock Console → Agents → Create agent
-2. **Agent name**: `kondate-menu-planner`
-3. **Agent description**: `Meal planning assistant for Japanese recipes`
-4. **Model**: `Claude Sonnet 4.5` (`anthropic.claude-sonnet-4-5-20250929-v1:0`)
-5. **IAM Role**: Use the role from stack output `BedrockAgentRoleArn`
+1. **Bedrock Agent** (`KondateAgent`) with:
+   - Agent name: `kondate-planner-agent`
+   - Model: Claude Sonnet 4.5 (via inference profile)
+   - Complete agent instructions (embedded in template)
+   - All three action groups with inline OpenAPI schemas:
+     - `GetRecipes` → `GetRecipesActionFunction`
+     - `GetHistory` → `GetHistoryActionFunction`
+     - `SaveMenu` → `SaveMenuActionFunction`
 
-### Step 2: Agent Instructions
+2. **Agent Alias** (`KondateAgentAlias`):
+   - Alias name: `production`
+   - Automatically linked to the latest agent version
 
-Paste the following into the agent instructions:
+3. **IAM Role** (`BedrockAgentRole`) with:
+   - Permissions to invoke all action Lambda functions
+   - Access to Claude Sonnet 4.5 inference profile (cross-region)
+   - CloudWatch Logs access for debugging
 
+### Viewing the Agent
+
+After deployment, you can view and test the agent in the Bedrock console:
+
+1. Go to **AWS Bedrock Console** → **Agents**
+2. Select `kondate-planner-agent`
+3. You'll see all action groups automatically configured
+4. Use the built-in test interface to interact with the agent
+
+### Modifying Agent Instructions
+
+To update the agent's behavior:
+
+1. Edit the `Instruction` field in `template.yaml` (lines 98-153)
+2. Run `sam build && sam deploy`
+3. CloudFormation will update the agent automatically
+4. The agent will auto-prepare with the new instructions
+
+**Note**: You can also modify instructions directly in the Bedrock console, but those changes will be overwritten on the next `sam deploy`. Always update `template.yaml` for persistent changes.
+
+## AWS Chatbot / Developer Q Setup
+
+The Developer Q Slack channel is now managed via CloudFormation. Here's how to set it up:
+
+### Prerequisites (One-Time Setup)
+
+**IMPORTANT**: Before deploying the CloudFormation stack, you must authorize your Slack workspace with AWS Chatbot:
+
+1. Go to **AWS Chatbot Console** → **Configure new client**
+2. Select **Slack**
+3. Click **Configure** and authorize your Slack workspace
+4. After authorization, note down your **Slack Workspace ID** (visible in the console)
+5. Get your **Slack Channel ID**:
+   - In Slack, right-click the channel name
+   - Select **Copy Link**
+   - The channel ID is the last part of the URL (e.g., `C12345ABCDE`)
+
+### Deployment with Slack Parameters
+
+Deploy the stack with your Slack credentials:
+
+```bash
+# Option 1: Via command line
+sam deploy --parameter-overrides \
+  SlackWorkspaceId=YOUR_WORKSPACE_ID \
+  SlackChannelId=YOUR_CHANNEL_ID
+
+# Option 2: Update samconfig.toml (DO NOT commit this file if public repo)
+# Add to [default.deploy.parameters]:
+# parameter_overrides = "SlackWorkspaceId=YOUR_WORKSPACE_ID SlackChannelId=YOUR_CHANNEL_ID"
 ```
-You are a helpful meal planning assistant that helps users create balanced Japanese meal plans.
 
-AVAILABLE RECIPES AND HISTORY:
-- Call get_recipes() to see all available recipes. You can optionally filter by category.
-- Call get_history() to see recent menus (default 30 days). Use this to avoid repeating recipes.
+**Security Note**: The Slack IDs are sensitive. If using a public repository:
+- Use Option 1 (command line) for deployments
+- Or store IDs in AWS Systems Manager Parameter Store and reference them
+- Never commit actual IDs to `samconfig.toml` in a public repo
 
-MEAL PLANNING RULES:
-When generating menu suggestions:
-1. Breakfast: 1-2 dishes (e.g., rice + miso soup, or toast + salad)
-2. Lunch: 1-3 dishes (balanced meal or bento-style)
-3. Dinner: 2-3 dishes (main + side + soup is common)
-4. Variety: Don't repeat the same main protein on consecutive days
-5. Balance: Include vegetables in every meal when possible
-6. Cooking time: Mix quick recipes (<30min) with more involved ones
+### What Gets Created
 
-RESPONSE FORMAT (IMPORTANT - For Slack compatibility):
-- Keep responses concise and well-structured
-- Use this compact format for menu suggestions:
-  **1日目 (Day 1):**
-  - 朝食: レシピ名1, レシピ名2
-  - 昼食: レシピ名1, レシピ名2
-  - 夕食: レシピ名1, レシピ名2, レシピ名3
-- Avoid repeating detailed recipe information (ingredients, cooking time, etc.)
-- Focus on recipe names and categories only
-- Keep additional commentary brief
+The CloudFormation stack creates:
 
-WORKFLOW:
-1. When user asks for menu suggestions, fetch recipes and recent history
-2. Generate a menu plan for the requested number of days (typically 3 or 7)
-3. Present the menu clearly with recipe names in compact format
-4. Ask: "この献立で保存しますか？ (Would you like me to save this menu?)"
-5. ONLY call save_menu() if user explicitly confirms (yes/はい/保存して/looks good/etc.)
-   - IMPORTANT: When calling save_menu(), you MUST provide the date parameter in YYYY-MM-DD format
-   - For today's menu, use today's date
-   - For future menus, use the appropriate future date
-   - Example: save_menu(date="2025-11-09", meals={...})
-6. If user says no or requests changes, regenerate based on their feedback
+1. **AWS::Chatbot::SlackChannelConfiguration** (`DeveloperQSlackChannel`)
+   - Links your Slack channel to AWS Chatbot
+   - Connects to the Bedrock Agent alias
+   - Uses the `AmazonQChatbotRole` IAM role
+   - Uses `InvokeBedrockAgentPolicy` as guardrail
 
-TONE:
-- Be friendly and conversational
-- Respond in Japanese or English based on user's language
-- Provide brief cooking tips or nutritional insights when relevant
-```
+2. **Shared Policy** (`InvokeBedrockAgentPolicy`)
+   - Used by both the IAM role AND the guardrail policy
+   - Allows `bedrock:InvokeAgent`, `bedrock:GetAgent`, `bedrock:ListAgents`
+   - Scoped to all agents in the account (minimal scope needed for AWS Chatbot)
 
-### Step 3: Add Action Groups
+3. **IAM Role** (`AmazonQChatbotRole`)
+   - Assumed by AWS Chatbot service
+   - Attached policies: `InvokeBedrockAgentPolicy` + `CloudWatchLogsReadOnlyAccess`
 
-**Action Group 1: GetRecipes**
-- **Name**: `GetRecipes`
-- **Description**: `Retrieve recipes from database`
-- **Lambda**: Select `GetRecipesActionFunction` from the list
-- **OpenAPI Schema**:
-  - Select "S3 Object"
-  - Bucket: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - Object key: `get-recipes.yaml`
+### Testing in Slack
 
-**Action Group 2: GetHistory**
-- **Name**: `GetHistory`
-- **Description**: `Retrieve menu history`
-- **Lambda**: Select `GetHistoryActionFunction` from the list
-- **OpenAPI Schema**:
-  - Select "S3 Object"
-  - Bucket: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - Object key: `get-history.yaml`
+After deployment completes, test in your configured Slack channel:
 
-**Action Group 3: SaveMenu**
-- **Name**: `SaveMenu`
-- **Description**: `Save approved menus`
-- **Lambda**: Select `SaveMenuActionFunction` from the list
-- **OpenAPI Schema**:
-  - Select "S3 Object"
-  - Bucket: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - Object key: `save-menu.yaml`
-
-### Step 4: Prepare and Test
-
-1. Click "Prepare" to build the agent
-2. Wait for preparation to complete (~2 minutes)
-3. Test in the console with prompts like:
-   - "3日分の献立を提案して" (Suggest a 3-day menu)
-   - "最近の献立を見せて" (Show recent menus)
-4. Create an **Alias** (e.g., `production`) for use with AWS Chatbot
-
-## AWS Chatbot Setup
-
-After creating the Bedrock Agent, configure AWS Chatbot to connect Slack:
-
-### Step 1: Configure Slack Workspace
-
-1. Go to AWS Chatbot Console
-2. Click "Configure new client" → Select **Slack**
-3. Authorize your Slack workspace
-4. Select a Slack channel (e.g., `#kondate-planner`)
-
-### Step 2: Configure Bedrock Agent Integration
-
-1. In the channel configuration:
-   - Enable "Amazon Bedrock Agent"
-   - Select agent: `kondate-menu-planner`
-   - Select alias: `production` (or `DRAFT` for testing)
-2. Set IAM role permissions:
-   - Grant `AmazonBedrockFullAccess` (or scoped policy for your agent)
-
-### Step 3: Test in Slack
-
-Go to your configured Slack channel and type:
 ```
 @AWS 3日分の献立を提案して
 ```
@@ -357,6 +343,18 @@ The agent should:
 2. Fetch recent history
 3. Generate a balanced 3-day menu
 4. Ask for confirmation before saving
+
+### Updating Configuration
+
+To change Slack channel or workspace:
+
+```bash
+sam deploy --parameter-overrides \
+  SlackWorkspaceId=NEW_WORKSPACE_ID \
+  SlackChannelId=NEW_CHANNEL_ID
+```
+
+CloudFormation will update the channel configuration without recreating other resources.
 
 ## Critical Implementation Details
 
@@ -453,30 +451,36 @@ echo '{
 
 ## Common Pitfalls
 
-1. **Schemas Not Uploaded**: If agent can't find actions, verify schemas are in S3 at the correct path
-2. **Lambda Permissions**: Ensure Lambda resource-based policies allow `bedrock.amazonaws.com` to invoke
-3. **Agent Not Prepared**: Always "Prepare" the agent after making changes to action groups or instructions
-4. **AWS Chatbot IAM**: Chatbot's IAM role needs permission to invoke the Bedrock Agent
-5. **Menu History Structure**: The `meals` field contains nested arrays - each meal type is an array of recipe objects
-6. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
-7. **Explicit Confirmation**: Agent should NEVER call `save_menu` without user approval - this is critical for UX
+1. **Missing Slack Parameters**: Deployment will fail if you don't provide `SlackWorkspaceId` and `SlackChannelId` parameters
+2. **Slack Workspace Not Authorized**: You must authorize your Slack workspace in AWS Chatbot console BEFORE deploying the CloudFormation stack
+3. **Lambda Permissions**: Ensure Lambda resource-based policies allow `bedrock.amazonaws.com` to invoke (automatically configured in template)
+4. **Menu History Structure**: The `meals` field contains nested arrays - each meal type is an array of recipe objects
+5. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
+6. **Explicit Confirmation**: Agent should NEVER call `save_menu` without user approval - this is critical for UX
+7. **Public Repository**: Never commit actual Slack IDs to `samconfig.toml` if using a public repo
 
 ## Deployment Checklist
 
 When deploying to a new environment:
 
-- [ ] Run `sam build && sam deploy --guided`
-- [ ] Note the S3 bucket name from outputs
-- [ ] Upload OpenAPI schemas to S3
-- [ ] Create Bedrock Agent in console (use stack outputs for ARNs)
-- [ ] Add action groups with correct Lambda ARNs
-- [ ] Prepare the agent
-- [ ] Test in Bedrock console
-- [ ] Create agent alias (`production`)
-- [ ] Configure AWS Chatbot with Slack workspace
-- [ ] Connect Chatbot to agent alias
-- [ ] Test end-to-end in Slack channel
+### First-Time Setup
+- [ ] Authorize Slack workspace in AWS Chatbot Console (one-time)
+- [ ] Get Slack Workspace ID from AWS Chatbot Console
+- [ ] Get Slack Channel ID from Slack (right-click channel > Copy Link)
+
+### Deployment
+- [ ] Run `sam build`
+- [ ] Run `sam deploy --parameter-overrides SlackWorkspaceId=XXX SlackChannelId=YYY`
+- [ ] Verify stack outputs show all resources created
+
+### Testing
+- [ ] Test in Slack: `@AWS 3日分の献立を提案して`
+- [ ] (Optional) Test in Bedrock console using the agent test interface
+
+### Data Setup
 - [ ] Seed sample data: `python scripts/seed_data.py --recipes 20 --history 30`
+
+**That's it!** The Bedrock Agent, action groups, IAM roles, and Slack integration are all managed by CloudFormation now.
 
 ## Future Enhancements
 

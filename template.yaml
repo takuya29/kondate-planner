@@ -2,6 +2,19 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Kondate Planner - Bedrock Agent for Meal Planning via Slack
 
+Parameters:
+  SlackWorkspaceId:
+    Type: String
+    Description: "Slack Workspace ID (get from AWS Chatbot console)"
+    AllowedPattern: "^[0-9A-Z]{1,255}$"
+    ConstraintDescription: "Must be a valid Slack workspace ID"
+
+  SlackChannelId:
+    Type: String
+    Description: "Slack Channel ID (right-click channel > Copy Link, use last part of URL)"
+    AllowedPattern: "^[A-Za-z0-9]+$"
+    ConstraintDescription: "Must be a valid Slack channel ID"
+
 Globals:
   Function:
     Runtime: python3.12
@@ -86,18 +99,290 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref MenuHistoryTable
 
-  # ==================== S3 Bucket for Agent Schemas ====================
-  AgentSchemasBucket:
-    Type: AWS::S3::Bucket
+  # ==================== Bedrock Agent ====================
+  KondateAgent:
+    Type: AWS::Bedrock::Agent
     Properties:
-      BucketName: !Sub 'kondate-agent-schemas-${AWS::AccountId}'
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      VersioningConfiguration:
-        Status: Enabled
+      AgentName: kondate-planner-agent
+      AgentResourceRoleArn: !GetAtt BedrockAgentRole.Arn
+      FoundationModel: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
+      Description: Meal planning assistant for Japanese recipes
+      IdleSessionTTLInSeconds: 600
+      Instruction: |
+        You are a helpful meal planning assistant that helps users create balanced Japanese meal plans.
+
+        AVAILABLE RECIPES AND HISTORY:
+        - Call get_recipes() to see all available recipes. You can optionally filter by category.
+        - Call get_history() to see recent menus (default 30 days). Use this to avoid repeating recipes.
+
+        MEAL PLANNING RULES:
+        When generating menu suggestions:
+        1. Breakfast: 1-2 dishes (e.g., rice + miso soup, or toast + salad)
+        2. Lunch: 1-3 dishes (balanced meal or bento-style)
+        3. Dinner: 2-3 dishes (main + side + soup is common)
+        4. Variety: Don't repeat the same main protein on consecutive days
+        5. Balance: Include vegetables in every meal when possible
+        6. Cooking time: Mix quick recipes (<30min) with more involved ones
+
+        RESPONSE FORMAT (IMPORTANT - For Slack compatibility):
+        - Keep responses concise and well-structured
+        - Use this compact format for menu suggestions:
+          **1日目 (Day 1):**
+          - 朝食: レシピ名1, レシピ名2
+          - 昼食: レシピ名1, レシピ名2
+          - 夕食: レシピ名1, レシピ名2, レシピ名3
+        - Avoid repeating detailed recipe information (ingredients, cooking time, etc.)
+        - Focus on recipe names and categories only
+        - Keep additional commentary brief
+
+        WORKFLOW:
+        1. When user asks for menu suggestions, fetch recipes and recent history
+        2. Generate a menu plan for the requested number of days (typically 3 or 7)
+        3. Present the menu clearly with recipe names in compact format
+        4. Ask: "この献立で保存しますか？ (Would you like me to save this menu?)"
+        5. ONLY call save_menu() if user explicitly confirms (yes/はい/保存して/looks good/etc.)
+           - IMPORTANT: When calling save_menu(), you MUST provide the date parameter in YYYY-MM-DD format
+           - For today's menu, use today's date
+           - For future menus, use the appropriate future date
+           - Example: save_menu(date="2025-11-09", meals={...})
+        6. If user says no or requests changes, regenerate based on their feedback
+
+        TONE:
+        - Be friendly and conversational
+        - Respond in Japanese or English based on user's language
+        - Provide brief cooking tips or nutritional insights when relevant
+      ActionGroups:
+        - ActionGroupName: GetRecipes
+          Description: Retrieve recipes from database
+          ActionGroupExecutor:
+            Lambda: !GetAtt GetRecipesActionFunction.Arn
+          ApiSchema:
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Get Recipes API
+                version: 1.0.0
+                description: Retrieve recipes from DynamoDB, optionally filtered by category
+              paths:
+                /get-recipes:
+                  post:
+                    summary: Get recipes
+                    description: Retrieve all recipes or filter by category (主菜, 副菜, 汁物, etc.)
+                    operationId: getRecipes
+                    requestBody:
+                      required: false
+                      content:
+                        application/json:
+                          schema:
+                            type: object
+                            properties:
+                              category:
+                                type: string
+                                description: Optional category filter (e.g., 主菜, 副菜, 汁物)
+                    responses:
+                      '200':
+                        description: Successful response
+                        content:
+                          application/json:
+                            schema:
+                              type: object
+                              properties:
+                                recipes:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      recipe_id:
+                                        type: string
+                                      name:
+                                        type: string
+                                      category:
+                                        type: string
+                                      cooking_time:
+                                        type: number
+                                      ingredients:
+                                        type: array
+                                        items:
+                                          type: string
+                                      recipe_url:
+                                        type: string
+                                      tags:
+                                        type: array
+                                        items:
+                                          type: string
+        - ActionGroupName: GetHistory
+          Description: Retrieve menu history
+          ActionGroupExecutor:
+            Lambda: !GetAtt GetHistoryActionFunction.Arn
+          ApiSchema:
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Get Menu History API
+                version: 1.0.0
+                description: Retrieve menu history for the past N days
+              paths:
+                /get-history:
+                  post:
+                    summary: Get menu history
+                    description: Retrieve menu history for past N days (default 30, max 365). Use this to avoid repeating recent recipes.
+                    operationId: getHistory
+                    requestBody:
+                      required: false
+                      content:
+                        application/json:
+                          schema:
+                            type: object
+                            properties:
+                              days:
+                                type: integer
+                                description: Number of days to retrieve (1-365, default 30)
+                                minimum: 1
+                                maximum: 365
+                    responses:
+                      '200':
+                        description: Successful response
+                        content:
+                          application/json:
+                            schema:
+                              type: object
+                              properties:
+                                history:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      date:
+                                        type: string
+                                        format: date
+                                      meals:
+                                        type: object
+                                        properties:
+                                          breakfast:
+                                            type: array
+                                            items:
+                                              type: object
+                                              properties:
+                                                recipe_id:
+                                                  type: string
+                                                name:
+                                                  type: string
+                                          lunch:
+                                            type: array
+                                            items:
+                                              type: object
+                                          dinner:
+                                            type: array
+                                            items:
+                                              type: object
+                                      recipes:
+                                        type: array
+                                        items:
+                                          type: string
+                                        description: Flat list of all recipe IDs used this day
+                                      notes:
+                                        type: string
+        - ActionGroupName: SaveMenu
+          Description: Save approved menus
+          ActionGroupExecutor:
+            Lambda: !GetAtt SaveMenuActionFunction.Arn
+          ApiSchema:
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Save Menu API
+                version: 1.0.0
+                description: Save a confirmed menu plan to history
+              paths:
+                /save-menu:
+                  post:
+                    summary: Save menu
+                    description: Save a menu plan to history. ONLY call this after user explicitly confirms (yes/はい/保存して/looks good).
+                    operationId: saveMenu
+                    requestBody:
+                      required: true
+                      content:
+                        application/json:
+                          schema:
+                            type: object
+                            required:
+                              - date
+                              - meals
+                            properties:
+                              date:
+                                type: string
+                                format: date
+                                description: Date in YYYY-MM-DD format
+                              meals:
+                                type: object
+                                required:
+                                  - breakfast
+                                  - lunch
+                                  - dinner
+                                properties:
+                                  breakfast:
+                                    type: array
+                                    items:
+                                      type: object
+                                      required:
+                                        - recipe_id
+                                        - name
+                                      properties:
+                                        recipe_id:
+                                          type: string
+                                        name:
+                                          type: string
+                                  lunch:
+                                    type: array
+                                    items:
+                                      type: object
+                                      required:
+                                        - recipe_id
+                                        - name
+                                  dinner:
+                                    type: array
+                                    items:
+                                      type: object
+                                      required:
+                                        - recipe_id
+                                        - name
+                              notes:
+                                type: string
+                                description: Optional notes about this menu
+                    responses:
+                      '200':
+                        description: Successful response
+                        content:
+                          application/json:
+                            schema:
+                              type: object
+                              properties:
+                                success:
+                                  type: boolean
+                                date:
+                                  type: string
+                                message:
+                                  type: string
+
+  KondateAgentAlias:
+    Type: AWS::Bedrock::AgentAlias
+    DependsOn: KondateAgent
+    Properties:
+      AgentId: !GetAtt KondateAgent.AgentId
+      AgentAliasName: production
+      Description: Production alias with inference profile support
+
+  # ==================== Amazon Q Developer / Chatbot ====================
+  DeveloperQSlackChannel:
+    Type: AWS::Chatbot::SlackChannelConfiguration
+    Properties:
+      ConfigurationName: kondate-developer-q-channel
+      IamRoleArn: !GetAtt AmazonQChatbotRole.Arn
+      SlackWorkspaceId: !Ref SlackWorkspaceId
+      SlackChannelId: !Ref SlackChannelId
+      LoggingLevel: INFO
+      GuardrailPolicies:
+        - !Ref InvokeBedrockAgentPolicy
 
   # ==================== Amazon Q / Chatbot IAM Role ====================
   AmazonQChatbotRole:
@@ -113,19 +398,25 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
-      Policies:
-        - PolicyName: InvokeBedrockAgent
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - bedrock:InvokeAgent
-                  - bedrock:GetAgent
-                  - bedrock:ListAgents
-                Resource:
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*/*'
+        - !Ref InvokeBedrockAgentPolicy
+
+  # ==================== Shared Bedrock Agent Policy ====================
+  InvokeBedrockAgentPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: kondate-invoke-bedrock-agent-policy
+      Description: Allow invocation of Bedrock Agent (used by both channel role and guardrail)
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - bedrock:InvokeAgent
+              - bedrock:GetAgent
+              - bedrock:ListAgents
+            Resource:
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*/*'
 
   # ==================== Bedrock Agent IAM Role ====================
   BedrockAgentRole:
@@ -173,17 +464,6 @@ Resources:
                   # Foundation models in both regions
                   - 'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
                   - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
-        - PolicyName: ReadAgentSchemas
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:ListBucket
-                Resource:
-                  - !Sub '${AgentSchemasBucket.Arn}/*'
-                  - !GetAtt AgentSchemasBucket.Arn
 
   # ==================== Lambda Resource-based Policies (Allow Bedrock to invoke) ====================
   GetRecipesActionInvokePermission:
@@ -210,16 +490,6 @@ Resources:
       Principal: bedrock.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
 
-  # ==================== Bedrock Agent ====================
-  # NOTE: Bedrock Agent and AgentAlias must be created manually or via AWS CLI
-  # because CloudFormation support is limited. Use the outputs below to configure.
-  #
-  # To create the agent manually:
-  # 1. Upload schemas to S3 (see outputs below)
-  # 2. Go to Bedrock console → Agents → Create agent
-  # 3. Use the configuration values from the outputs
-  # 4. Configure AWS Chatbot to use the agent
-
 Outputs:
   # ==================== DynamoDB ====================
   RecipesTableName:
@@ -243,10 +513,22 @@ Outputs:
     Description: "ARN of SaveMenuAction Lambda"
     Value: !GetAtt SaveMenuActionFunction.Arn
 
-  # ==================== S3 Bucket ====================
-  AgentSchemasBucketName:
-    Description: "S3 bucket for agent schemas"
-    Value: !Ref AgentSchemasBucket
+  # ==================== Bedrock Agent ====================
+  BedrockAgentId:
+    Description: "Bedrock Agent ID"
+    Value: !GetAtt KondateAgent.AgentId
+
+  BedrockAgentArn:
+    Description: "Bedrock Agent ARN"
+    Value: !GetAtt KondateAgent.AgentArn
+
+  BedrockAgentAliasId:
+    Description: "Bedrock Agent Alias ID (production)"
+    Value: !GetAtt KondateAgentAlias.AgentAliasId
+
+  BedrockAgentAliasArn:
+    Description: "Bedrock Agent Alias ARN (use this in AWS Chatbot)"
+    Value: !GetAtt KondateAgentAlias.AgentAliasArn
 
   # ==================== IAM Roles ====================
   AmazonQChatbotRoleArn:
@@ -257,51 +539,32 @@ Outputs:
     Description: "IAM Role ARN for Bedrock Agent"
     Value: !GetAtt BedrockAgentRole.Arn
 
-  AgentInstructions:
-    Description: "Instructions to paste into Bedrock Agent configuration"
+  # ==================== Developer Q / Chatbot ====================
+  DeveloperQSlackChannelArn:
+    Description: "Developer Q Slack Channel Configuration ARN"
+    Value: !Ref DeveloperQSlackChannel
+
+  InvokeBedrockAgentPolicyArn:
+    Description: "Bedrock Agent invocation policy ARN (used by both role and guardrail)"
+    Value: !Ref InvokeBedrockAgentPolicy
+
+  # ==================== Setup Instructions ====================
+  NextSteps:
+    Description: "Post-deployment setup instructions"
     Value: |
-      You are a helpful meal planning assistant that helps users create balanced Japanese meal plans.
+      Deployment complete! Your Bedrock Agent and Developer Q Slack channel are ready.
 
-      AVAILABLE RECIPES AND HISTORY:
-      - Call get_recipes() to see all available recipes. You can optionally filter by category.
-      - Call get_history() to see recent menus (default 30 days). Use this to avoid repeating recipes.
+      1. Test the agent in Slack:
+         - Go to your configured Slack channel
+         - Type: @AWS 3日分の献立を提案して
 
-      MEAL PLANNING RULES:
-      When generating menu suggestions:
-      1. Breakfast: 1-2 dishes (e.g., rice + miso soup, or toast + salad)
-      2. Lunch: 1-3 dishes (balanced meal or bento-style)
-      3. Dinner: 2-3 dishes (main + side + soup is common)
-      4. Variety: Don't repeat the same main protein on consecutive days
-      5. Balance: Include vegetables in every meal when possible
-      6. Cooking time: Mix quick recipes (<30min) with more involved ones
+      2. Test in Bedrock Console (optional):
+         - Navigate to Amazon Bedrock > Agents
+         - Select kondate-planner-agent
+         - Use the built-in test interface
 
-      RESPONSE FORMAT (IMPORTANT - For Slack compatibility):
-      - Keep responses concise and well-structured
-      - Use this compact format for menu suggestions:
-        **1日目 (Day 1):**
-        - 朝食: レシピ名1, レシピ名2
-        - 昼食: レシピ名1, レシピ名2
-        - 夕食: レシピ名1, レシピ名2, レシピ名3
-      - Avoid repeating detailed recipe information (ingredients, cooking time, etc.)
-      - Focus on recipe names and categories only
-      - Keep additional commentary brief
+      3. Seed sample data (if not done already):
+         python scripts/seed_data.py --recipes 20 --history 30
 
-      WORKFLOW:
-      1. When user asks for menu suggestions, fetch recipes and recent history
-      2. Generate a menu plan for the requested number of days (typically 3 or 7)
-      3. Present the menu clearly with recipe names in compact format
-      4. Ask: "この献立で保存しますか？ (Would you like me to save this menu?)"
-      5. ONLY call save_menu() if user explicitly confirms (yes/はい/保存して/looks good/etc.)
-      6. If user says no or requests changes, regenerate based on their feedback
-
-      TONE:
-      - Be friendly and conversational
-      - Respond in Japanese or English based on user's language
-      - Provide brief cooking tips or nutritional insights when relevant
-
-  SchemaUploadCommands:
-    Description: "Commands to upload schemas to S3"
-    Value: !Sub |
-      aws s3 cp src/schemas/get-recipes.yaml s3://${AgentSchemasBucket}/get-recipes.yaml
-      aws s3 cp src/schemas/get-history.yaml s3://${AgentSchemasBucket}/get-history.yaml
-      aws s3 cp src/schemas/save-menu.yaml s3://${AgentSchemasBucket}/save-menu.yaml
+      Note: If you need to update Slack workspace/channel IDs later,
+      use `sam deploy` with --parameter-overrides
