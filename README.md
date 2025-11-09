@@ -4,7 +4,7 @@ AWS SAMを使った個人利用の献立提案アプリケーションです。A
 
 ## 機能概要
 
-- **Slack経由の対話型献立提案**: AWS Chatbotを通じてSlackから自然言語で献立をリクエスト
+- **Slack経由の対話型献立提案**: Amazon Q Developerを通じてSlackから自然言語で献立をリクエスト
 - **AI献立生成**: Bedrock Agentが過去の履歴を考慮してバランスの良い献立を提案
 - **履歴管理**: 過去の献立を参照し、同じレシピの繰り返しを避ける
 - **明示的な保存確認**: ユーザーが承認した献立のみを保存
@@ -18,14 +18,12 @@ graph TB
     User[ユーザー<br/>Slack]
 
     subgraph AWS["AWS Cloud (ap-northeast-1)"]
-        Chatbot[AWS Chatbot<br/>Slack統合]
+        Chatbot[Amazon Q Developer<br/>Slack統合]
 
         subgraph Bedrock["Amazon Bedrock"]
             Agent[Bedrock Agent<br/>kondate-menu-planner]
             Claude[Claude Sonnet 4.5<br/>Inference Profile]
         end
-
-        LambdaLayer[Lambda Layer<br/>共通ライブラリ]
 
         subgraph Lambda["Action Lambda Functions"]
             GetRecipes[レシピ取得<br/>GetRecipesAction]
@@ -47,10 +45,6 @@ graph TB
     Agent -->|アクション呼び出し| GetHistory
     Agent -->|アクション呼び出し| SaveMenu
 
-    LambdaLayer --> GetRecipes
-    LambdaLayer --> GetHistory
-    LambdaLayer --> SaveMenu
-
     GetRecipes -->|Scan| RecipesDB
     GetHistory -->|GetItem| HistoryDB
     SaveMenu -->|PutItem| HistoryDB
@@ -58,14 +52,14 @@ graph TB
     Chatbot -->|応答| User
 ```
 
-AWS ChatbotがSlack統合を担当し、Bedrock Agentが自然言語理解とLambdaアクションの実行を統括します。
+Amazon Q DeveloperがSlack統合を担当し、Bedrock Agentが自然言語理解とLambdaアクションの実行を統括します。
 
 ### 対話フロー例
 
 ```mermaid
 sequenceDiagram
     participant User as ユーザー(Slack)
-    participant Chatbot as AWS Chatbot
+    participant Chatbot as Amazon Q Developer
     participant Agent as Bedrock Agent
     participant GetRecipes as GetRecipesAction
     participant GetHistory as GetHistoryAction
@@ -73,7 +67,7 @@ sequenceDiagram
     participant RecipesDB as recipes テーブル
     participant HistoryDB as menu_history テーブル
 
-    User->>Chatbot: @AWS 3日分の献立を提案して
+    User->>Chatbot: @Amazon Q 3日分の献立を提案して
     Chatbot->>Agent: ユーザーリクエスト
 
     Agent->>GetRecipes: get_recipes()
@@ -106,7 +100,7 @@ sequenceDiagram
 
 - **Lambda**: Python 3.12, ARM64
 - **Bedrock Agent**: Claude Sonnet 4.5 (Inference Profile)
-- **AWS Chatbot**: Slack統合
+- **Amazon Q Developer**: Slack統合
 - **DynamoDB**: 2テーブル（recipes, menu_history）
 - **リージョン**: ap-northeast-1（東京）
 
@@ -160,9 +154,9 @@ AWSコンソールで以下を実行：
 
 ### 2. Slackワークスペースの認証（初回のみ）
 
-**重要**: デプロイ前に、Slackワークスペースを AWS Chatbot に認証する必要があります：
+**重要**: デプロイ前に、Slackワークスペースを Amazon Q Developer に認証する必要があります：
 
-1. **AWS Chatbot Console** → **Configure new client**
+1. **Amazon Q Developer Console** → **Configure new client**
 2. **Slack** を選択
 3. **Configure** をクリックしてSlackワークスペースを認証
 4. 認証後、**Slack Workspace ID** をメモ（コンソールに表示されます）
@@ -382,10 +376,10 @@ Resource:
   - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
 ```
 
-### AWS Chatbotが応答しない
+### Amazon Q Developerが応答しない
 
-1. Chatbot設定でBedrockエージェントが正しく選択されているか確認
-2. ChatbotのIAMロールがエージェント呼び出し権限を持っているか確認
+1. Amazon Q Developer設定でBedrockエージェントが正しく選択されているか確認
+2. Amazon Q DeveloperのIAMロールがエージェント呼び出し権限を持っているか確認
 3. Slackチャンネルで `@Amazon Q` メンションをつけているか確認
 
 ## デプロイチェックリスト
@@ -394,7 +388,7 @@ Resource:
 
 ### 初回セットアップ
 - [ ] Amazon Bedrockで Claude Sonnet 4.5 のモデルアクセスを有効化
-- [ ] AWS Chatbot ConsoleでSlackワークスペースを認証
+- [ ] Amazon Q Developer ConsoleでSlackワークスペースを認証
 - [ ] Slack Workspace IDとChannel IDを取得
 
 ### デプロイ
@@ -436,7 +430,7 @@ sam delete
 
 - [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
 - [Amazon Bedrock Agents Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html)
-- [AWS Chatbot Documentation](https://docs.aws.amazon.com/chatbot/)
+- [Amazon Q Developer Documentation](https://docs.aws.amazon.com/amazonq/)
 - [DynamoDB Documentation](https://docs.aws.amazon.com/dynamodb/)
 
 ## 詳細ドキュメント
