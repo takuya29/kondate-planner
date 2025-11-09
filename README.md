@@ -246,12 +246,39 @@ pip install boto3
 python scripts/seed_data.py --recipes 20 --history 30
 ```
 
-### 7. Slackで動作確認
+### 7. SlackでBedrockコネクタを追加
 
-設定したSlackチャンネルで:
+デプロイ後、Slackチャンネルでエージェントに接続する必要があります：
+
+```bash
+# まず、Agent IDとAlias IDを取得
+aws cloudformation describe-stacks --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
+  --output table
+```
+
+Slackチャンネルで以下のコマンドを実行：
 
 ```
-@AWS 3日分の献立を提案して
+@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID
+```
+
+**例**:
+```
+@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:123456789012:agent/ABCDEFGHIJ TESTALIASID
+```
+
+**注意**:
+- `YOUR_ACCOUNT_ID`: AWSアカウントID
+- `YOUR_AGENT_ID`: 上記コマンドで取得したAgent ID
+- `YOUR_ALIAS_ID`: 上記コマンドで取得したAlias ID
+
+### 8. Slackで動作確認
+
+コネクタの追加が完了したら、設定したSlackチャンネルで:
+
+```
+@Amazon Q 3日分の献立を提案して
 ```
 
 エージェントが以下を実行するはずです:
@@ -265,19 +292,19 @@ python scripts/seed_data.py --recipes 20 --history 30
 ### 献立の提案を受ける
 
 ```
-@AWS 7日分の献立を提案してください
+@Amazon Q 7日分の献立を提案してください
 ```
 
 ### 最近の献立を確認
 
 ```
-@AWS 最近の献立を見せて
+@Amazon Q 最近の献立を見せて
 ```
 
 ### 特定カテゴリのレシピを見る
 
 ```
-@AWS 主菜のレシピを教えて
+@Amazon Q 主菜のレシピを教えて
 ```
 
 ### 献立を保存
@@ -378,7 +405,7 @@ Resource:
 
 1. Chatbot設定でBedrockエージェントが正しく選択されているか確認
 2. ChatbotのIAMロールがエージェント呼び出し権限を持っているか確認
-3. Slackチャンネルで `@AWS` メンションをつけているか確認
+3. Slackチャンネルで `@Amazon Q` メンションをつけているか確認
 
 ## デプロイチェックリスト
 
@@ -394,8 +421,12 @@ Resource:
 - [ ] `sam deploy --parameter-overrides SlackWorkspaceId=XXX SlackChannelId=YYY` を実行
 - [ ] デプロイ完了を確認（すべてのリソースが自動作成される）
 
+### Bedrockコネクタの追加
+- [ ] Agent IDとAlias IDを取得: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentId\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
+- [ ] Slackで `@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID` を実行
+
 ### 動作確認
-- [ ] Slackでテスト: `@AWS 3日分の献立を提案して`
+- [ ] Slackでテスト: `@Amazon Q 3日分の献立を提案して`
 - [ ] （オプション）Bedrockコンソールでエージェントを確認
 
 ### データ投入

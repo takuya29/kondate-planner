@@ -206,6 +206,7 @@ All action functions are designed for Bedrock Agent invocation (not API Gateway)
 Provides common utilities to all action functions:
 - **AWS Clients**: `dynamodb` and `bedrock` clients (initialized once)
 - **`decimal_to_float(obj)`**: Recursively converts DynamoDB `Decimal` to Python `float`/`int`
+- **`parse_bedrock_parameter(value, field_name)`**: Converts Bedrock Agent parameters from Python dict format to proper JSON objects
 - **`create_response()`**: Legacy function (not used by agent actions, kept for compatibility)
 
 **Note**: The layer structure is `src/layers/common/utils.py` (not nested in a `python/` subdirectory). SAM automatically packages this correctly for Lambda layer deployment.
@@ -332,12 +333,46 @@ The CloudFormation stack creates:
    - Assumed by AWS Chatbot service
    - Attached policies: `InvokeBedrockAgentPolicy` + `CloudWatchLogsReadOnlyAccess`
 
-### Testing in Slack
+### Adding Bedrock Connector in Slack
 
-After deployment completes, test in your configured Slack channel:
+After deployment completes, you need to connect the Bedrock Agent to your Slack channel:
+
+**Step 1: Get Agent ID and Alias ID**
+
+```bash
+aws cloudformation describe-stacks --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
+  --output table
+```
+
+**Step 2: Add the connector in Slack**
+
+In your Slack channel, run:
 
 ```
-@AWS 3日分の献立を提案して
+@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID
+```
+
+**Example**:
+```
+@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:123456789012:agent/ABCDEFGHIJ TESTALIASID
+```
+
+Replace:
+- `YOUR_ACCOUNT_ID`: Your AWS account ID
+- `YOUR_AGENT_ID`: BedrockAgentId from Step 1
+- `YOUR_ALIAS_ID`: BedrockAgentAliasId from Step 1
+
+**Other useful commands**:
+- List connectors: `@Amazon Q connector list`
+- Delete connector: `@Amazon Q connector delete kondate-planner`
+
+### Testing in Slack
+
+After adding the connector, test in your configured Slack channel:
+
+```
+@Amazon Q 3日分の献立を提案して
 ```
 
 The agent should:
@@ -440,7 +475,7 @@ echo '{
 - Provides detailed trace of action invocations
 
 **In Slack (via AWS Chatbot)**:
-- Mention `@AWS` followed by your request
+- Mention `@Amazon Q` followed by your request
 - Agent responses appear as threaded messages
 
 ### Common Test Scenarios
@@ -487,8 +522,12 @@ When deploying to a new environment:
 - [ ] Run `sam deploy --parameter-overrides SlackWorkspaceId=XXX SlackChannelId=YYY`
 - [ ] Verify stack outputs show all resources created
 
+### Add Bedrock Connector
+- [ ] Get Agent ID and Alias ID: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentId\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
+- [ ] In Slack: `@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID`
+
 ### Testing
-- [ ] Test in Slack: `@AWS 3日分の献立を提案して`
+- [ ] Test in Slack: `@Amazon Q 3日分の献立を提案して`
 - [ ] (Optional) Test in Bedrock console using the agent test interface
 
 ### Data Setup
