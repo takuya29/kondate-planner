@@ -98,26 +98,30 @@ pylint src/ tests/
 ### MyPy (Type Checking)
 
 ```bash
-mypy src/
+mypy src/ --explicit-package-bases
 ```
+
+**Note**: The `--explicit-package-bases` flag is required to handle multiple `app.py` files in different directories without duplicate module errors.
 
 ### Run All Linters
 
 ```bash
-black --check src/ tests/ && flake8 src/ tests/ && pylint src/ tests/ && mypy src/
+black --check src/ tests/ && flake8 src/ tests/ && pylint src/ tests/ && mypy src/ --explicit-package-bases
 ```
 
 ## Test Coverage
 
-The project enforces a minimum test coverage of **80%**.
+The project enforces a minimum test coverage of **80%**. Current coverage: **94.38%**
 
-Current coverage areas:
+Current coverage by module:
 
-- ✅ **get_recipes action**: All paths covered (fetch all, filter by category, error handling)
-- ✅ **get_history action**: All paths covered (default/custom days, validation, error handling)
-- ✅ **save_menu action**: All paths covered (save, overwrite, validation, Bedrock parameter parsing)
-- ✅ **utils.py**: All utility functions covered (decimal conversion, parameter parsing)
+- ✅ **get_recipes action**: 100% coverage (fetch all, filter by category, error handling)
+- ✅ **get_history action**: 98% coverage (default/custom days, validation, error handling)
+- ✅ **save_menu action**: 98% coverage (save, overwrite, validation, Bedrock parameter parsing)
+- ✅ **utils.py**: 83% coverage (decimal conversion, parameter parsing, lazy-loaded AWS clients)
 - ✅ **Integration tests**: Full workflow testing across actions
+
+**Note**: The lower coverage in `utils.py` is due to lazy-loaded AWS client getter functions (`get_dynamodb()`, `get_bedrock()`) which are tested indirectly through Lambda function tests but not directly unit tested.
 
 ## Key Test Scenarios
 
@@ -244,6 +248,19 @@ To enable coverage reporting with Codecov:
 ### Import Errors
 
 If you encounter import errors when running tests, ensure the Python path is set up correctly in `conftest.py`.
+
+### AWS Client Initialization Errors
+
+The project uses **lazy-loaded AWS clients** in `utils.py` to avoid `NoRegionError` during test collection:
+
+- `get_dynamodb()` and `get_bedrock()` functions initialize clients only when called
+- Tests use moto's `@mock_aws` decorator to mock AWS services
+- Clients are created within the mocked context, not at module import time
+
+If you see `botocore.exceptions.NoRegionError`, ensure:
+1. AWS clients are accessed via getter functions (`get_dynamodb()`) not direct imports
+2. Tests are using the `mock_aws` context manager from moto
+3. Environment variables (`AWS_DEFAULT_REGION`) are set in test fixtures
 
 ### DynamoDB Mocking Issues
 
