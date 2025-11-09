@@ -336,31 +336,32 @@ The CloudFormation stack creates:
 
 After deployment completes, you need to connect the Bedrock Agent to your Slack channel:
 
-**Step 1: Get Agent ID and Alias ID**
+**Step 1: Get Agent ARN and Alias ID**
 
+Option 1 - Via CLI:
 ```bash
 aws cloudformation describe-stacks --stack-name kondate-planner \
-  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
+  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentArn` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
   --output table
 ```
+
+Option 2 - Via Bedrock Agent Console:
+- Go to **Bedrock Agent Console** → **Agents** → **kondate-planner-agent**
+- Agent ARN is shown at the top of the agent details page
+- Alias ID can be found in the **Aliases** section (look for `production`)
 
 **Step 2: Add the connector in Slack**
 
 In your Slack channel, run:
 
 ```
-@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID
+@Amazon Q connector add kondate-planner <Agent ARN> <Alias ID>
 ```
 
 **Example**:
 ```
 @Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:123456789012:agent/ABCDEFGHIJ TESTALIASID
 ```
-
-Replace:
-- `YOUR_ACCOUNT_ID`: Your AWS account ID
-- `YOUR_AGENT_ID`: BedrockAgentId from Step 1
-- `YOUR_ALIAS_ID`: BedrockAgentAliasId from Step 1
 
 **Other useful commands**:
 - List connectors: `@Amazon Q connector list`
@@ -522,8 +523,8 @@ When deploying to a new environment:
 - [ ] Verify stack outputs show all resources created
 
 ### Add Bedrock Connector
-- [ ] Get Agent ID and Alias ID: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentId\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
-- [ ] In Slack: `@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID`
+- [ ] Get Agent ARN and Alias ID: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentArn\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
+- [ ] In Slack: `@Amazon Q connector add kondate-planner <Agent ARN> <Alias ID>`
 
 ### Testing
 - [ ] Test in Slack: `@Amazon Q 3日分の献立を提案して`

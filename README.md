@@ -172,25 +172,22 @@ python scripts/seed_data.py --recipes 20 --history 30
 
 ### 4. SlackでBedrockコネクタを追加
 
-デプロイ後、Slackチャンネルでエージェントに接続する必要があります：
+デプロイ後、Slackチャンネルでエージェントに接続します：
 
 ```bash
-# まず、Agent IDとAlias IDを取得
+# Agent ARNとAlias IDを取得（またはBedrock Agentコンソールから確認）
 aws cloudformation describe-stacks --stack-name kondate-planner \
-  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
+  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentArn` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
   --output table
 ```
 
 Slackチャンネルで以下のコマンドを実行：
 
 ```
-@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID
+@Amazon Q connector add kondate-planner <Agent ARN> <Alias ID>
 ```
 
-**注意**:
-- `YOUR_ACCOUNT_ID`: AWSアカウントID
-- `YOUR_AGENT_ID`: 上記コマンドで取得したAgent ID
-- `YOUR_ALIAS_ID`: 上記コマンドで取得したAlias ID
+例: `@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:123456789012:agent/ABCDEFGHIJ TESTALIASID`
 
 ### 5. Slackで動作確認
 
