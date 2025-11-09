@@ -11,45 +11,40 @@ echo "=========================================="
 echo "Deploying Kondate Planner"
 echo "=========================================="
 
-# Step 1: Get current Agent Version before deployment
+# Step 1: Deploy CloudFormation stack (AutoPrepare will prepare DRAFT automatically)
 echo ""
-echo "[1/4] Getting current agent version..."
-AGENT_ID=$(aws cloudformation describe-stacks \
-  --stack-name "$STACK_NAME" \
-  --region "$REGION" \
-  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId`].OutputValue' \
-  --output text 2>/dev/null || echo "")
+echo "[1/3] Running sam deploy..."
+DEPLOY_OUTPUT=$(mktemp)
+AGENT_CHANGED=false
 
-if [ -n "$AGENT_ID" ]; then
-  AGENT_VERSION_BEFORE=$(aws bedrock-agent get-agent \
-    --agent-id "$AGENT_ID" \
-    --region "$REGION" \
-    --query 'agent.agentVersion' \
-    --output text 2>/dev/null || echo "")
-  echo "Current Agent Version: $AGENT_VERSION_BEFORE"
-else
-  echo "Stack not found (first deployment)"
-  AGENT_VERSION_BEFORE=""
-fi
-
-# Step 2: Deploy CloudFormation stack (AutoPrepare will prepare DRAFT automatically)
-echo ""
-echo "[2/4] Running sam deploy..."
-if sam deploy --resolve-s3; then
+if sam deploy --resolve-s3 2>&1 | tee "$DEPLOY_OUTPUT"; then
   echo "✓ CloudFormation stack deployed/updated successfully"
+
+  # Check if KondateAgent was in the changeset (created or modified)
+  if grep -E "(CREATE_COMPLETE|UPDATE_COMPLETE).*KondateAgent.*AWS::Bedrock::Agent" "$DEPLOY_OUTPUT" > /dev/null; then
+    echo "✓ Bedrock Agent (KondateAgent) was created or modified"
+    AGENT_CHANGED=true
+  else
+    echo "ℹ Bedrock Agent (KondateAgent) was not modified"
+    AGENT_CHANGED=false
+  fi
 else
   EXIT_CODE=$?
   if [ $EXIT_CODE -eq 1 ]; then
     echo "ℹ No CloudFormation changes detected - stack is up to date"
+    AGENT_CHANGED=false
   else
     echo "✗ Deployment failed with exit code $EXIT_CODE"
+    rm -f "$DEPLOY_OUTPUT"
     exit $EXIT_CODE
   fi
 fi
 
-# Step 3: Get Agent ID and check if agent version changed
+rm -f "$DEPLOY_OUTPUT"
+
+# Step 2: Get Agent ID from CloudFormation outputs
 echo ""
-echo "[3/4] Checking if agent was modified..."
+echo "[2/3] Getting Agent ID from stack outputs..."
 AGENT_ID=$(aws cloudformation describe-stacks \
   --stack-name "$STACK_NAME" \
   --region "$REGION" \
@@ -63,28 +58,10 @@ fi
 
 echo "Agent ID: $AGENT_ID"
 
-# Check if agent version changed
-AGENT_VERSION_AFTER=$(aws bedrock-agent get-agent \
-  --agent-id "$AGENT_ID" \
-  --region "$REGION" \
-  --query 'agent.agentVersion' \
-  --output text)
-
-echo "Agent Version After Deploy: $AGENT_VERSION_AFTER"
-
-AGENT_CHANGED=false
-if [ "$AGENT_VERSION_BEFORE" != "$AGENT_VERSION_AFTER" ]; then
-  echo "✓ Agent was modified (version changed from $AGENT_VERSION_BEFORE to $AGENT_VERSION_AFTER)"
-  AGENT_CHANGED=true
-else
-  echo "ℹ Agent was not modified (version unchanged: $AGENT_VERSION_AFTER)"
-  AGENT_CHANGED=false
-fi
-
 if [ "$AGENT_CHANGED" = true ]; then
-  # Step 4: Update alias (automatically creates new version and points to it)
+  # Step 3: Update alias (automatically creates new version and points to it)
   echo ""
-  echo "[4/4] Updating production alias..."
+  echo "[3/3] Updating production alias..."
   ALIAS_ID=$(aws cloudformation describe-stacks \
     --stack-name "$STACK_NAME" \
     --region "$REGION" \
