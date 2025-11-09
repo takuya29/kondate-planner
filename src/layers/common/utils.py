@@ -1,4 +1,5 @@
 import json
+import re
 import boto3
 from decimal import Decimal
 
@@ -30,3 +31,72 @@ def decimal_to_float(obj):
     if isinstance(obj, list):
         return [decimal_to_float(item) for item in obj]
     return obj
+
+
+def parse_bedrock_parameter(value, field_name="parameter"):
+    """
+    Convert Bedrock Agent parameter format to proper Python object.
+
+    Bedrock Agent sometimes sends parameters in Python dict-like format instead of JSON:
+    Input: {lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
+    Output: {"lunch":[{"recipe_id":"recipe_019","name":"焼きそば"}],"breakfast":[...]}
+
+    Args:
+        value: The parameter value (can be string, dict, or other type)
+        field_name: Name of the field for error messages
+
+    Returns:
+        Parsed Python object (dict, list, etc.)
+
+    Raises:
+        ValueError: If the value cannot be parsed
+    """
+    # If already a dict or list, return as-is
+    if isinstance(value, (dict, list)):
+        return value
+
+    # If not a string, return as-is
+    if not isinstance(value, str):
+        return value
+
+    # Try to parse as JSON first
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        pass
+
+    # Convert Python-like dict format to JSON
+    # Input: {lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
+    # Output: {"lunch":[{"recipe_id":"recipe_019","name":"焼きそば"}],"breakfast":[...]}
+
+    try:
+        converted = value
+
+        # Step 1: Replace = with :
+        converted = converted.replace('=', ':')
+
+        # Step 2: Add quotes around keys (words followed by colon)
+        # Matches: word: -> "word":
+        converted = re.sub(r'([{,]\s*)([a-z_]+):', r'\1"\2":', converted)
+
+        # Step 3: Add quotes around unquoted string values
+        # Matches values that are not already quoted and not numbers/booleans
+        # Pattern: ": recipe_019" -> ": "recipe_019""
+        converted = re.sub(r':\s*([a-zA-Z][a-zA-Z0-9_]*)', r': "\1"', converted)
+
+        # Step 4: Add quotes around Japanese/special character values
+        # Matches: ": 焼きそば," -> ": "焼きそば","
+        converted = re.sub(
+            r':\s*([^"\[\]{},:\s][^,}\]]*?)([,}\]])',
+            lambda m: f': "{m.group(1).strip()}"{m.group(2)}',
+            converted
+        )
+
+        # Try to parse the converted string
+        return json.loads(converted)
+
+    except (json.JSONDecodeError, Exception) as e:
+        raise ValueError(
+            f"Unable to parse {field_name}. "
+            f"Expected JSON or Python dict format. Error: {str(e)}"
+        )

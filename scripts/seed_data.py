@@ -21,10 +21,11 @@ logger = logging.getLogger(__name__)
 dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
 
 # サンプルレシピデータ
+# カテゴリ: 主菜 (main dish), 副菜 (side dish), 汁物 (soup), 主食 (staple/carbs), デザート (dessert)
 SAMPLE_RECIPES = [
     {
         "name": "カレーライス",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 45,
         "ingredients": ["玉ねぎ", "にんじん", "じゃがいも", "豚肉", "カレールー"],
         "instructions": "野菜と肉を炒めて、水を加えて煮込み、カレールーを溶かす",
@@ -32,7 +33,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "親子丼",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 20,
         "ingredients": ["鶏もも肉", "玉ねぎ", "卵", "だし", "醤油", "みりん"],
         "instructions": "鶏肉と玉ねぎを煮て、溶き卵を加える",
@@ -40,7 +41,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "ハンバーグ",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 30,
         "ingredients": ["合いびき肉", "玉ねぎ", "パン粉", "卵", "デミグラスソース"],
         "instructions": "材料をこねて形を作り、焼く",
@@ -48,7 +49,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "麻婆豆腐",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 25,
         "ingredients": ["豆腐", "豚ひき肉", "ネギ", "豆板醤", "醤油", "鶏がらスープ"],
         "instructions": "ひき肉を炒め、豆腐を加えて煮込む",
@@ -56,7 +57,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "鮭の塩焼き",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 15,
         "ingredients": ["鮭", "塩"],
         "instructions": "鮭に塩を振って焼く",
@@ -64,7 +65,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "豚の生姜焼き",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 20,
         "ingredients": ["豚ロース", "玉ねぎ", "生姜", "醤油", "みりん"],
         "instructions": "豚肉と玉ねぎを炒め、タレを絡める",
@@ -72,7 +73,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "パスタカルボナーラ",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 20,
         "ingredients": ["パスタ", "ベーコン", "卵", "粉チーズ", "生クリーム"],
         "instructions": "パスタを茹で、ソースと絡める",
@@ -104,7 +105,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "トースト",
-        "category": "朝食",
+        "category": "主食",
         "cooking_time": 5,
         "ingredients": ["食パン", "バター", "ジャム"],
         "instructions": "パンを焼いてバターやジャムを塗る",
@@ -112,7 +113,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "納豆ご飯",
-        "category": "朝食",
+        "category": "主食",
         "cooking_time": 5,
         "ingredients": ["ご飯", "納豆", "ネギ", "醤油"],
         "instructions": "納豆をかき混ぜてご飯にのせる",
@@ -128,7 +129,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "焼き魚定食",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 20,
         "ingredients": ["アジ", "塩", "大根おろし", "レモン"],
         "instructions": "魚に塩を振って焼く",
@@ -136,7 +137,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "チャーハン",
-        "category": "メイン",
+        "category": "主食",
         "cooking_time": 15,
         "ingredients": ["ご飯", "卵", "ハム", "ネギ", "醤油"],
         "instructions": "ご飯と具材を強火で炒める",
@@ -144,7 +145,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "うどん",
-        "category": "メイン",
+        "category": "主食",
         "cooking_time": 15,
         "ingredients": ["うどん", "だし", "ネギ", "天かす"],
         "instructions": "うどんを茹で、温かいだしをかける",
@@ -152,7 +153,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "オムライス",
-        "category": "メイン",
+        "category": "主食",
         "cooking_time": 25,
         "ingredients": ["ご飯", "鶏肉", "玉ねぎ", "卵", "ケチャップ"],
         "instructions": "チキンライスを作り、卵で包む",
@@ -160,7 +161,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "肉じゃが",
-        "category": "メイン",
+        "category": "主菜",
         "cooking_time": 35,
         "ingredients": ["じゃがいも", "にんじん", "玉ねぎ", "牛肉", "醤油", "みりん"],
         "instructions": "材料を煮込む",
@@ -168,7 +169,7 @@ SAMPLE_RECIPES = [
     },
     {
         "name": "焼きそば",
-        "category": "メイン",
+        "category": "主食",
         "cooking_time": 15,
         "ingredients": ["焼きそば麺", "キャベツ", "豚肉", "ソース"],
         "instructions": "麺と具材を炒めてソースで味付け",

@@ -137,7 +137,7 @@ kondate-planner/
 │   ├── layers/                # 共通Lambda Layer
 │   │   └── common/
 │   │       └── utils.py
-│   └── schemas/               # OpenAPIスキーマ（参照用、実際はtemplate.yamlに埋め込み）
+│   └── schemas/               # OpenAPIスキーマ（参照用のみ、実際はtemplate.yamlに埋め込み）
 │       ├── get-recipes.yaml
 │       ├── get-history.yaml
 │       └── save-menu.yaml

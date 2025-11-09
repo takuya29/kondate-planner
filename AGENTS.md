@@ -219,7 +219,6 @@ Provides common utilities to all action functions:
 - `get-recipes.yaml` - Reference schema for get_recipes action
 - `get-history.yaml` - Reference schema for get_history action
 - `save-menu.yaml` - Reference schema for save_menu action
-- `history-management.yaml` - **Unused** legacy combined schema
 
 **Important**: The schemas in `src/schemas/` are NOT used by the deployed agent. They serve as reference documentation only. All active schemas are defined inline in `template.yaml`. The `description` fields in the inline schemas are critical - the agent reads them to understand when to use each action.
 
@@ -395,16 +394,14 @@ CloudFormation will update the channel configuration without recreating other re
 
 ## Critical Implementation Details
 
-### SaveMenuAction - Python Format Conversion
+### Bedrock Agent Parameter Parsing
 
-The `save_menu` action includes special handling for Bedrock Agent's parameter format (`save_menu/app.py` lines 73-111):
-
-**Issue**: Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
+Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
 ```
 {lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
 ```
 
-**Solution**: The Lambda function includes regex-based conversion logic to transform Python format to valid JSON. This conversion is transparent to the user but critical for reliability when saving menus.
+**Solution**: The shared layer includes `parse_bedrock_parameter()` utility (`utils.py`) that handles this conversion using regex-based transformation. This is used by `save_menu` action to parse the `meals` parameter. The conversion is transparent to the user but critical for reliability.
 
 ### Amazon Bedrock Permissions
 
@@ -506,7 +503,7 @@ echo '{
 5. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
 6. **Explicit Confirmation**: Agent should NEVER call `save_menu` without user approval - this is critical for UX
 7. **Public Repository**: Never commit actual Slack IDs to `samconfig.toml` if using a public repo
-8. **Recipe Categories**: Current seed data uses inconsistent categories (`メイン`, `副菜`, `汁物`, `朝食`). Consider standardizing to match agent instructions if creating custom recipes
+8. **Recipe Categories**: When adding custom recipes, use standard categories: `主菜` (main dish), `副菜` (side dish), `汁物` (soup), `主食` (staple/carbs), `デザート` (dessert)
 
 ## Deployment Checklist
 
