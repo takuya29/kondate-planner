@@ -55,8 +55,19 @@ def lambda_handler(event, context):
         }
     """
     try:
+        # Log the full event for debugging
+        logger.info(f"Received event: {json.dumps(event)}")
+
         # Extract parameters from Bedrock Agent event format
-        parameters = {p["name"]: p["value"] for p in event.get("parameters", [])}
+        # For POST requests with requestBody, parameters are in requestBody.content.application/json
+        parameters_list = event.get("parameters", [])
+        if not parameters_list and "requestBody" in event:
+            request_body = event.get("requestBody", {})
+            content = request_body.get("content", {})
+            parameters_list = content.get("application/json", [])
+
+        parameters = {p["name"]: p["value"] for p in parameters_list}
+        logger.info(f"Extracted parameters: {json.dumps(parameters)}")
 
         # Parse meals JSON if it's a string
         meals = parameters.get("meals")
