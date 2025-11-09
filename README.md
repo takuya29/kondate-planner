@@ -37,8 +37,6 @@ graph TB
             RecipesDB[(DynamoDB<br/>kondate-recipes)]
             HistoryDB[(DynamoDB<br/>kondate-menu-history)]
         end
-
-        S3[S3 Bucket<br/>OpenAPIスキーマ]
     end
 
     User -->|メッセージ| Chatbot
@@ -48,8 +46,6 @@ graph TB
     Agent -->|アクション呼び出し| GetRecipes
     Agent -->|アクション呼び出し| GetHistory
     Agent -->|アクション呼び出し| SaveMenu
-
-    Agent -.->|スキーマ参照| S3
 
     LambdaLayer --> GetRecipes
     LambdaLayer --> GetHistory
@@ -112,7 +108,6 @@ sequenceDiagram
 - **Bedrock Agent**: Claude Sonnet 4.5 (Inference Profile)
 - **AWS Chatbot**: Slack統合
 - **DynamoDB**: 2テーブル（recipes, menu_history）
-- **S3**: OpenAPIスキーマ保存
 - **リージョン**: ap-northeast-1（東京）
 
 ## プロジェクト構成
@@ -376,9 +371,9 @@ echo '{
 
 ### エージェントがアクションを見つけられない
 
-1. OpenAPIスキーマがS3に正しくアップロードされているか確認
-2. エージェントのアクショングループ設定でスキーマパスが正しいか確認
-3. エージェントを「Prepare」し直す
+1. `template.yaml` の `ApiSchema` にスキーマが正しく定義されているか確認
+2. エージェントのアクショングループ設定が正しいか確認
+3. Bedrockコンソールでエージェントを「Prepare」し直す
 
 ### Lambdaが呼び出されない
 
@@ -449,10 +444,6 @@ Resource:
 ```bash
 # SAMスタックの削除
 sam delete
-
-# 手動作成したリソースも削除
-# - Bedrock Agent（コンソールから）
-# - AWS Chatbot設定（コンソールから）
 ```
 
 ## 参考リンク
