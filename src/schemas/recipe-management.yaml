@@ -1,0 +1,75 @@
+openapi: 3.0.0
+info:
+  title: Recipe Management API
+  version: 1.0.0
+  description: Access to recipe database for meal planning
+
+paths:
+  /get_recipes:
+    post:
+      operationId: getRecipes
+      description: |
+        Retrieves all recipes from the database. Optionally filter by category.
+
+        Use this action when:
+        - User asks about available recipes
+        - Planning menus and need to see what recipes are available
+        - User wants to filter by specific meal category
+
+        Categories include: 主菜 (main dish), 副菜 (side dish), 汁物 (soup),
+        主食 (staple/rice), デザート (dessert).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                  description: Filter recipes by category (e.g., "主菜", "副菜", "汁物")
+                  example: "主菜"
+      responses:
+        '200':
+          description: List of recipes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - recipes
+                properties:
+                  recipes:
+                    type: array
+                    description: Array of recipe objects
+                    items:
+                      type: object
+                      properties:
+                        recipe_id:
+                          type: string
+                          description: Unique identifier for the recipe
+                        name:
+                          type: string
+                          description: Recipe name
+                        category:
+                          type: string
+                          description: Recipe category (主菜, 副菜, etc.)
+                        cooking_time:
+                          type: integer
+                          description: Cooking time in minutes
+                        ingredients:
+                          type: array
+                          description: List of ingredients
+                          items:
+                            type: string
+                        recipe_url:
+                          type: string
+                          description: URL to the full recipe (optional)
+                        tags:
+                          type: array
+                          description: Tags for the recipe
+                          items:
+                            type: string
+                  error:
+                    type: string
+                    description: Error message if something went wrong
