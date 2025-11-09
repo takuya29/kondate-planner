@@ -74,6 +74,7 @@ def lambda_handler(event, context):
         meals = parse_bedrock_parameter(parameters.get("meals"), "meals")
         date = parameters.get("date")
         notes = parameters.get("notes")
+        overwrite = parameters.get("overwrite", "false").lower() == "true"
 
         # Validate required fields
         if not date:
@@ -90,6 +91,36 @@ def lambda_handler(event, context):
             raise ValueError("meals must be an object")
 
         logger.info(f"Saving menu history for date: {date}")
+
+        # Check for existing entry
+        table = dynamodb.Table(HISTORY_TABLE)
+        existing_response = table.get_item(Key={"date": date})
+        existing_item = existing_response.get("Item")
+
+        if existing_item and not overwrite:
+            # Convert Decimal to float for JSON serialization
+            existing_item = decimal_to_float(existing_item)
+            logger.warning(f"Menu already exists for {date}, overwrite not confirmed")
+            return {
+                "messageVersion": "1.0",
+                "response": {
+                    "actionGroup": event.get("actionGroup"),
+                    "apiPath": event.get("apiPath"),
+                    "httpMethod": event.get("httpMethod"),
+                    "httpStatusCode": 409,
+                    "responseBody": {
+                        "application/json": {
+                            "body": json.dumps({
+                                "success": False,
+                                "error": "duplicate_date",
+                                "date": date,
+                                "existing_menu": existing_item,
+                                "message": f"A menu already exists for {date}. Please confirm if you want to overwrite it."
+                            })
+                        }
+                    }
+                }
+            }
 
         # Build history object
         history = {
@@ -112,9 +143,9 @@ def lambda_handler(event, context):
             history["notes"] = notes
 
         # Save to DynamoDB
-        table = dynamodb.Table(HISTORY_TABLE)
         table.put_item(Item=history)
 
+        action_message = "Menu history updated (overwritten)" if existing_item else "Menu history saved successfully"
         logger.info(f"Successfully saved menu history for {date}")
 
         # Return in Bedrock Agent response format
@@ -130,7 +161,8 @@ def lambda_handler(event, context):
                         "body": json.dumps({
                             "success": True,
                             "date": date,
-                            "message": "Menu history saved successfully"
+                            "overwritten": existing_item is not None,
+                            "message": action_message
                         })
                     }
                 }

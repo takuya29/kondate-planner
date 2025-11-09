@@ -108,6 +108,7 @@ Resources:
       FoundationModel: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
       Description: Meal planning assistant for Japanese recipes
       IdleSessionTTLInSeconds: 600
+      AutoPrepare: true
       Instruction: |
         You are a helpful meal planning assistant that helps users create balanced Japanese meal plans.
 
@@ -146,6 +147,21 @@ Resources:
            - For future menus, use the appropriate future date
            - Example: save_menu(date="2025-11-09", meals={...})
         6. If user says no or requests changes, regenerate based on their feedback
+
+        HANDLING DUPLICATE DATES:
+        - If save_menu() returns error "duplicate_date" (status 409), a menu already exists for that date
+        - IMPORTANT: You MUST display the existing menu to the user before asking for confirmation
+        - Format the existing menu clearly showing what's already registered:
+          "この日には既に以下の献立が登録されています：
+          - 朝食: [existing breakfast recipes]
+          - 昼食: [existing lunch recipes]
+          - 夕食: [existing dinner recipes]
+
+          上書きしますか？"
+        - The existing menu details are in the error response's "existing_menu" field
+        - If user confirms overwrite, call save_menu() again with overwrite=true parameter
+        - If user declines, do not save and suggest picking a different date
+        - Example: save_menu(date="2025-11-09", meals={...}, overwrite=true)
 
         TONE:
         - Be friendly and conversational
@@ -349,6 +365,9 @@ Resources:
                               notes:
                                 type: string
                                 description: Optional notes about this menu
+                              overwrite:
+                                type: boolean
+                                description: Set to true to overwrite existing menu for this date. Default is false. If false and menu exists, returns error with existing menu details.
                     responses:
                       '200':
                         description: Successful response
@@ -361,6 +380,28 @@ Resources:
                                   type: boolean
                                 date:
                                   type: string
+                                overwritten:
+                                  type: boolean
+                                  description: True if an existing menu was overwritten
+                                message:
+                                  type: string
+                      '409':
+                        description: Menu already exists for this date (overwrite not confirmed)
+                        content:
+                          application/json:
+                            schema:
+                              type: object
+                              properties:
+                                success:
+                                  type: boolean
+                                error:
+                                  type: string
+                                  description: Error code (duplicate_date)
+                                date:
+                                  type: string
+                                existing_menu:
+                                  type: object
+                                  description: The existing menu data for this date
                                 message:
                                   type: string
 
@@ -370,7 +411,9 @@ Resources:
     Properties:
       AgentId: !GetAtt KondateAgent.AgentId
       AgentAliasName: production
-      Description: Production alias with inference profile support
+      Description: Production alias pointing to auto-prepared DRAFT version
+      RoutingConfiguration:
+        - AgentVersion: DRAFT
 
   # ==================== Amazon Q Developer / Chatbot ====================
   DeveloperQSlackChannel:
