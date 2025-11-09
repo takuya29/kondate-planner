@@ -108,24 +108,24 @@ def lambda_handler(event, context):
                 except json.JSONDecodeError as e:
                     logger.error(f"Still failed to parse after conversion: {str(e)}")
                     logger.error(f"Converted string was: {meals_str}")
-                    raise ValueError(f"meals の形式が不正です: {str(e)}")
+                    raise ValueError(f"Invalid meals format: {str(e)}")
 
         date = parameters.get("date")
         notes = parameters.get("notes")
 
         # Validate required fields
         if not date:
-            raise ValueError("dateは必須項目です")
+            raise ValueError("date is required")
         if not meals:
-            raise ValueError("mealsは必須項目です")
+            raise ValueError("meals is required")
 
         # Validate date format
         if not validate_date_format(date):
-            raise ValueError("日付は YYYY-MM-DD 形式で指定してください")
+            raise ValueError("date must be in YYYY-MM-DD format")
 
         # Validate meals structure
         if not isinstance(meals, dict):
-            raise ValueError("mealsはオブジェクト形式である必要があります")
+            raise ValueError("meals must be an object")
 
         logger.info(f"Saving menu history for date: {date}")
 
@@ -168,7 +168,7 @@ def lambda_handler(event, context):
                         "body": json.dumps({
                             "success": True,
                             "date": date,
-                            "message": "献立履歴を保存しました"
+                            "message": "Menu history saved successfully"
                         })
                     }
                 }
@@ -189,7 +189,7 @@ def lambda_handler(event, context):
                         "body": json.dumps({
                             "success": False,
                             "error": str(e),
-                            "message": f"保存に失敗しました: {str(e)}"
+                            "message": f"Failed to save menu: {str(e)}"
                         })
                     }
                 }
@@ -209,7 +209,7 @@ def lambda_handler(event, context):
                         "body": json.dumps({
                             "success": False,
                             "error": str(e),
-                            "message": f"保存中にエラーが発生しました: {str(e)}"
+                            "message": f"Error occurred while saving menu: {str(e)}"
                         })
                     }
                 }
