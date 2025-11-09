@@ -59,12 +59,13 @@ def lambda_handler(event, context):
         logger.info(f"Received event: {json.dumps(event)}")
 
         # Extract parameters from Bedrock Agent event format
-        # For POST requests with requestBody, parameters are in requestBody.content.application/json
+        # For POST requests with requestBody, parameters are in requestBody.content.application/json.properties
         parameters_list = event.get("parameters", [])
         if not parameters_list and "requestBody" in event:
             request_body = event.get("requestBody", {})
             content = request_body.get("content", {})
-            parameters_list = content.get("application/json", [])
+            app_json = content.get("application/json", {})
+            parameters_list = app_json.get("properties", [])
 
         parameters = {p["name"]: p["value"] for p in parameters_list}
         logger.info(f"Extracted parameters: {json.dumps(parameters)}")
@@ -72,7 +73,42 @@ def lambda_handler(event, context):
         # Parse meals JSON if it's a string
         meals = parameters.get("meals")
         if isinstance(meals, str):
-            meals = json.loads(meals)
+            # Bedrock Agent returns Python-like format: {key=[{key=value}]}
+            # Convert to proper JSON format by using ast.literal_eval approach
+            try:
+                meals = json.loads(meals)
+            except json.JSONDecodeError:
+                logger.info("Converting Python-like format to JSON")
+                import re
+                meals_str = meals
+
+                # Convert Python-like dict format to JSON:
+                # Input: {lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
+                # Output: {"lunch":[{"recipe_id":"recipe_019","name":"焼きそば"}],"breakfast":[...]}
+
+                # Step 1: Replace = with :
+                meals_str = meals_str.replace('=', ':')
+
+                # Step 2: Add quotes around keys (words followed by colon)
+                # Matches: word: -> "word":
+                meals_str = re.sub(r'([{,]\s*)([a-z_]+):', r'\1"\2":', meals_str)
+
+                # Step 3: Add quotes around unquoted string values
+                # Matches values that are not already quoted and not numbers/booleans
+                # Pattern: ": recipe_019" -> ": "recipe_019""
+                meals_str = re.sub(r':\s*([a-zA-Z][a-zA-Z0-9_]*)', r': "\1"', meals_str)
+
+                # Step 4: Add quotes around Japanese/special character values
+                # Matches: ": 焼きそば," -> ": "焼きそば","
+                meals_str = re.sub(r':\s*([^"\[\]{},:\s][^,}\]]*?)([,}\]])', lambda m: f': "{m.group(1).strip()}"{m.group(2)}', meals_str)
+
+                logger.info(f"Converted meals string: {meals_str}")
+                try:
+                    meals = json.loads(meals_str)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Still failed to parse after conversion: {str(e)}")
+                    logger.error(f"Converted string was: {meals_str}")
+                    raise ValueError(f"meals の形式が不正です: {str(e)}")
 
         date = parameters.get("date")
         notes = parameters.get("notes")
