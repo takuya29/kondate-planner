@@ -252,7 +252,7 @@ The `template.yaml` automatically creates:
    - Automatically linked to the latest agent version
 
 3. **IAM Role** (`BedrockAgentRole`) with:
-   - Permissions to invoke all action Lambda functions
+   - Permissions to invoke all Lambda functions
    - Access to Foundation Model via inference profile (cross-region)
    - CloudWatch Logs access for debugging
 

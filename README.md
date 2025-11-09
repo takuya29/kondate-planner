@@ -25,7 +25,7 @@ graph TB
             Model[Foundation Model<br/>例: Claude Sonnet 4.5]
         end
 
-        subgraph Lambda["Action Lambda Functions"]
+        subgraph Lambda["Lambda Functions"]
             GetRecipes[レシピ取得<br/>GetRecipesAction]
             GetHistory[履歴取得<br/>GetHistoryAction]
             SaveMenu[献立保存<br/>SaveMenuAction]
