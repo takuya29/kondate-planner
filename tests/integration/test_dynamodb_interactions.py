@@ -165,7 +165,6 @@ class TestDynamoDBIntegration:
     def test_overwrite_existing_menu(self, mock_dynamodb_tables, bedrock_agent_event):
         """Test overwriting an existing menu entry."""
         from src.agent_actions.save_menu import app as save_menu_app
-        from src.agent_actions.get_history import app as get_history_app
 
         # First attempt: should fail without overwrite flag
         save_event = bedrock_agent_event.copy()

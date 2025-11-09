@@ -1,9 +1,6 @@
 """Unit tests for get_history action (src/agent_actions/get_history/app.py)."""
 
 import json
-from datetime import datetime, timedelta
-
-import pytest
 
 
 class TestGetHistoryAction:

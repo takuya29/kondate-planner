@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 
 class TestGetRecipesAction:
     """Test cases for get_recipes Lambda handler."""

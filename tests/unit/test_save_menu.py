@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 
 class TestSaveMenuAction:
     """Test cases for save_menu Lambda handler."""
