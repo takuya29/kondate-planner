@@ -37,8 +37,6 @@ graph TB
             RecipesDB[(DynamoDB<br/>kondate-recipes)]
             HistoryDB[(DynamoDB<br/>kondate-menu-history)]
         end
-
-        S3[S3 Bucket<br/>OpenAPIスキーマ]
     end
 
     User -->|メッセージ| Chatbot
@@ -48,8 +46,6 @@ graph TB
     Agent -->|アクション呼び出し| GetRecipes
     Agent -->|アクション呼び出し| GetHistory
     Agent -->|アクション呼び出し| SaveMenu
-
-    Agent -.->|スキーマ参照| S3
 
     LambdaLayer --> GetRecipes
     LambdaLayer --> GetHistory
@@ -112,7 +108,6 @@ sequenceDiagram
 - **Bedrock Agent**: Claude Sonnet 4.5 (Inference Profile)
 - **AWS Chatbot**: Slack統合
 - **DynamoDB**: 2テーブル（recipes, menu_history）
-- **S3**: OpenAPIスキーマ保存
 - **リージョン**: ap-northeast-1（東京）
 
 ## プロジェクト構成
@@ -221,20 +216,6 @@ aws cloudformation describe-stacks --stack-name kondate-planner \
 4. テストインターフェースで動作確認可能
 
 **注意**: エージェント指示を変更する場合は `template.yaml` を編集し、再デプロイしてください。コンソールでの変更は次回デプロイ時に上書きされます。
-
-~~### 4. Bedrock Agentの作成~~
-
-~~AWSコンソールでBedrockエージェントを作成します。~~
-
-~~#### 4-1. エージェントの基本設定~~
-
-~~1. Amazon Bedrockコンソール → Agents → Create agent~~
-~~2. **エージェント名**: `kondate-menu-planner`~~
-~~3. **説明**: `日本料理の献立計画アシスタント`~~
-~~4. **モデル**: `Claude Sonnet 4.5`~~
-~~5. **IAMロール**: デプロイ時の出力 `BedrockAgentRoleArn` を使用~~
-
-~~#### 4-2. エージェント指示の設定~~
 
 ### 6. サンプルデータの投入
 
@@ -376,9 +357,9 @@ echo '{
 
 ### エージェントがアクションを見つけられない
 
-1. OpenAPIスキーマがS3に正しくアップロードされているか確認
-2. エージェントのアクショングループ設定でスキーマパスが正しいか確認
-3. エージェントを「Prepare」し直す
+1. `template.yaml` の `ApiSchema` にスキーマが正しく定義されているか確認
+2. エージェントのアクショングループ設定が正しいか確認
+3. Bedrockコンソールでエージェントを「Prepare」し直す
 
 ### Lambdaが呼び出されない
 
@@ -449,10 +430,6 @@ Resource:
 ```bash
 # SAMスタックの削除
 sam delete
-
-# 手動作成したリソースも削除
-# - Bedrock Agent（コンソールから）
-# - AWS Chatbot設定（コンソールから）
 ```
 
 ## 参考リンク
