@@ -1,0 +1,24 @@
+[MASTER]
+ignore=CVS,.git,__pycache__,.venv,venv,.aws-sam,build,dist
+jobs=1
+
+[MESSAGES CONTROL]
+disable=C0111,  # missing-docstring
+        C0103,  # invalid-name
+        R0903,  # too-few-public-methods
+        R0913,  # too-many-arguments
+        W0212,  # protected-access
+        C0330,  # bad-continuation
+
+[FORMAT]
+max-line-length=88
+indent-string='    '
+
+[BASIC]
+good-names=i,j,k,ex,_,id,db
+
+[DESIGN]
+max-args=7
+max-locals=15
+max-branches=12
+max-statements=50

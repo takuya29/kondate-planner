@@ -2,7 +2,7 @@ import os
 import logging
 import json
 
-from utils import dynamodb, decimal_to_float
+from utils import get_dynamodb, decimal_to_float
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def lambda_handler(event, context):
 
         logger.info(f"Getting recipes with category filter: {category}")
 
-        table = dynamodb.Table(RECIPES_TABLE)
+        table = get_dynamodb().Table(RECIPES_TABLE)
         response = table.scan()
         recipes = decimal_to_float(response.get("Items", []))
 
@@ -73,11 +73,9 @@ def lambda_handler(event, context):
                 "httpMethod": event.get("httpMethod"),
                 "httpStatusCode": 200,
                 "responseBody": {
-                    "application/json": {
-                        "body": json.dumps({"recipes": recipes})
-                    }
-                }
-            }
+                    "application/json": {"body": json.dumps({"recipes": recipes})}
+                },
+            },
         }
 
     except Exception as e:
@@ -94,6 +92,6 @@ def lambda_handler(event, context):
                     "application/json": {
                         "body": json.dumps({"error": str(e), "recipes": []})
                     }
-                }
-            }
+                },
+            },
         }

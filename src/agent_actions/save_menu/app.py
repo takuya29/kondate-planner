@@ -3,7 +3,7 @@ import logging
 import json
 from datetime import datetime
 
-from utils import dynamodb, decimal_to_float, parse_bedrock_parameter
+from utils import get_dynamodb, decimal_to_float, parse_bedrock_parameter
 
 # Configure logging for this module
 logger = logging.getLogger(__name__)
@@ -93,7 +93,7 @@ def lambda_handler(event, context):
         logger.info(f"Saving menu history for date: {date}")
 
         # Check for existing entry
-        table = dynamodb.Table(HISTORY_TABLE)
+        table = get_dynamodb().Table(HISTORY_TABLE)
         existing_response = table.get_item(Key={"date": date})
         existing_item = existing_response.get("Item")
 
@@ -110,16 +110,18 @@ def lambda_handler(event, context):
                     "httpStatusCode": 409,
                     "responseBody": {
                         "application/json": {
-                            "body": json.dumps({
-                                "success": False,
-                                "error": "duplicate_date",
-                                "date": date,
-                                "existing_menu": existing_item,
-                                "message": f"A menu already exists for {date}. Please confirm if you want to overwrite it."
-                            })
+                            "body": json.dumps(
+                                {
+                                    "success": False,
+                                    "error": "duplicate_date",
+                                    "date": date,
+                                    "existing_menu": existing_item,
+                                    "message": f"A menu already exists for {date}. Please confirm if you want to overwrite it.",
+                                }
+                            )
                         }
-                    }
-                }
+                    },
+                },
             }
 
         # Build history object
@@ -145,7 +147,11 @@ def lambda_handler(event, context):
         # Save to DynamoDB
         table.put_item(Item=history)
 
-        action_message = "Menu history updated (overwritten)" if existing_item else "Menu history saved successfully"
+        action_message = (
+            "Menu history updated (overwritten)"
+            if existing_item
+            else "Menu history saved successfully"
+        )
         logger.info(f"Successfully saved menu history for {date}")
 
         # Return in Bedrock Agent response format
@@ -158,15 +164,17 @@ def lambda_handler(event, context):
                 "httpStatusCode": 200,
                 "responseBody": {
                     "application/json": {
-                        "body": json.dumps({
-                            "success": True,
-                            "date": date,
-                            "overwritten": existing_item is not None,
-                            "message": action_message
-                        })
+                        "body": json.dumps(
+                            {
+                                "success": True,
+                                "date": date,
+                                "overwritten": existing_item is not None,
+                                "message": action_message,
+                            }
+                        )
                     }
-                }
-            }
+                },
+            },
         }
 
     except ValueError as e:
@@ -180,14 +188,16 @@ def lambda_handler(event, context):
                 "httpStatusCode": 400,
                 "responseBody": {
                     "application/json": {
-                        "body": json.dumps({
-                            "success": False,
-                            "error": str(e),
-                            "message": f"Failed to save menu: {str(e)}"
-                        })
+                        "body": json.dumps(
+                            {
+                                "success": False,
+                                "error": str(e),
+                                "message": f"Failed to save menu: {str(e)}",
+                            }
+                        )
                     }
-                }
-            }
+                },
+            },
         }
     except Exception as e:
         logger.error(f"Error saving menu: {str(e)}", exc_info=True)
@@ -200,12 +210,14 @@ def lambda_handler(event, context):
                 "httpStatusCode": 500,
                 "responseBody": {
                     "application/json": {
-                        "body": json.dumps({
-                            "success": False,
-                            "error": str(e),
-                            "message": f"Error occurred while saving menu: {str(e)}"
-                        })
+                        "body": json.dumps(
+                            {
+                                "success": False,
+                                "error": str(e),
+                                "message": f"Error occurred while saving menu: {str(e)}",
+                            }
+                        )
                     }
-                }
-            }
+                },
+            },
         }

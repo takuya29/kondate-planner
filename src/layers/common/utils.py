@@ -3,9 +3,25 @@ import re
 import boto3
 from decimal import Decimal
 
-# AWS Clients (initialized once)
-dynamodb = boto3.resource("dynamodb")
-bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
+# AWS Clients (lazy-initialized to avoid import-time errors in test environments)
+_dynamodb = None
+_bedrock = None
+
+
+def get_dynamodb():
+    """Get or create DynamoDB resource."""
+    global _dynamodb
+    if _dynamodb is None:
+        _dynamodb = boto3.resource("dynamodb")
+    return _dynamodb
+
+
+def get_bedrock():
+    """Get or create Bedrock client."""
+    global _bedrock
+    if _bedrock is None:
+        _bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
+    return _bedrock
 
 
 def create_response(status_code, body, is_json=True):
@@ -59,6 +75,10 @@ def parse_bedrock_parameter(value, field_name="parameter"):
     if not isinstance(value, str):
         return value
 
+    # If empty string, return as-is
+    if value == "":
+        return value
+
     # Try to parse as JSON first
     try:
         return json.loads(value)
@@ -73,23 +93,23 @@ def parse_bedrock_parameter(value, field_name="parameter"):
         converted = value
 
         # Step 1: Replace = with :
-        converted = converted.replace('=', ':')
+        converted = converted.replace("=", ":")
 
         # Step 2: Add quotes around keys (words followed by colon)
         # Matches: word: -> "word":
-        converted = re.sub(r'([{,]\s*)([a-z_]+):', r'\1"\2":', converted)
+        converted = re.sub(r"([{,]\s*)([a-z_]+):", r'\1"\2":', converted)
 
         # Step 3: Add quotes around unquoted string values
         # Matches values that are not already quoted and not numbers/booleans
         # Pattern: ": recipe_019" -> ": "recipe_019""
-        converted = re.sub(r':\s*([a-zA-Z][a-zA-Z0-9_]*)', r': "\1"', converted)
+        converted = re.sub(r":\s*([a-zA-Z][a-zA-Z0-9_]*)", r': "\1"', converted)
 
         # Step 4: Add quotes around Japanese/special character values
         # Matches: ": 焼きそば," -> ": "焼きそば","
         converted = re.sub(
             r':\s*([^"\[\]{},:\s][^,}\]]*?)([,}\]])',
             lambda m: f': "{m.group(1).strip()}"{m.group(2)}',
-            converted
+            converted,
         )
 
         # Try to parse the converted string
