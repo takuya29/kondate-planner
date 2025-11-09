@@ -9,6 +9,10 @@ region = "ap-northeast-1"
 confirm_changeset = false
 capabilities = "CAPABILITY_IAM CAPABILITY_NAMED_IAM"
 image_repositories = []
+# To deploy with Slack integration, add your parameters:
+# parameter_overrides = "SlackWorkspaceId=YOUR_WORKSPACE_ID SlackChannelId=YOUR_CHANNEL_ID"
+# Get workspace ID from: AWS Chatbot Console > Configured clients
+# Get channel ID: Right-click Slack channel > Copy Link (use the last part of the URL)
 
 [default.build]
 [default.build.parameters]

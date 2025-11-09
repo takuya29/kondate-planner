@@ -2,6 +2,19 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: Kondate Planner - Bedrock Agent for Meal Planning via Slack
 
+Parameters:
+  SlackWorkspaceId:
+    Type: String
+    Description: "Slack Workspace ID (get from AWS Chatbot console)"
+    AllowedPattern: "^[0-9A-Z]{1,255}$"
+    ConstraintDescription: "Must be a valid Slack workspace ID"
+
+  SlackChannelId:
+    Type: String
+    Description: "Slack Channel ID (right-click channel > Copy Link, use last part of URL)"
+    AllowedPattern: "^[A-Za-z0-9]+$"
+    ConstraintDescription: "Must be a valid Slack channel ID"
+
 Globals:
   Function:
     Runtime: python3.12
@@ -359,6 +372,20 @@ Resources:
       AgentAliasName: production
       Description: Production alias with inference profile support
 
+  # ==================== Amazon Q Developer / Chatbot ====================
+  DeveloperQSlackChannel:
+    Type: AWS::Chatbot::SlackChannelConfiguration
+    Properties:
+      ConfigurationName: kondate-developer-q-channel
+      IamRoleArn: !GetAtt AmazonQChatbotRole.Arn
+      SlackWorkspaceId: !Ref SlackWorkspaceId
+      SlackChannelId: !Ref SlackChannelId
+      LoggingLevel: INFO
+      CustomizationResourceArns:
+        - !GetAtt KondateAgentAlias.AgentAliasArn
+      GuardrailPolicies:
+        - arn:aws:iam::aws:policy/ReadOnlyAccess
+
   # ==================== Amazon Q / Chatbot IAM Role ====================
   AmazonQChatbotRole:
     Type: AWS::IAM::Role
@@ -508,22 +535,28 @@ Outputs:
     Description: "IAM Role ARN for Bedrock Agent"
     Value: !GetAtt BedrockAgentRole.Arn
 
+  # ==================== Developer Q / Chatbot ====================
+  DeveloperQSlackChannelArn:
+    Description: "Developer Q Slack Channel Configuration ARN"
+    Value: !Ref DeveloperQSlackChannel
+
   # ==================== Setup Instructions ====================
   NextSteps:
     Description: "Post-deployment setup instructions"
     Value: |
-      Bedrock Agent has been created! Next steps:
+      Deployment complete! Your Bedrock Agent and Developer Q Slack channel are ready.
 
-      1. Configure AWS Chatbot:
-         - Go to AWS Chatbot Console
-         - Configure Slack workspace integration
-         - Select channel (e.g., #kondate-planner)
-         - Enable "Amazon Bedrock Agent"
-         - Use Agent Alias ARN from outputs above
+      1. Test the agent in Slack:
+         - Go to your configured Slack channel
+         - Type: @AWS 3日分の献立を提案して
 
-      2. Test the agent:
-         - In Bedrock Console: Test the agent directly
-         - In Slack: @AWS 3日分の献立を提案して
+      2. Test in Bedrock Console (optional):
+         - Navigate to Amazon Bedrock > Agents
+         - Select kondate-planner-agent
+         - Use the built-in test interface
 
-      3. Seed sample data:
+      3. Seed sample data (if not done already):
          python scripts/seed_data.py --recipes 20 --history 30
+
+      Note: If you need to update Slack workspace/channel IDs later,
+      use `sam deploy` with --parameter-overrides
