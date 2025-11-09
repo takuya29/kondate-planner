@@ -19,15 +19,15 @@ def safe_int_conversion(
     if value is None or value == "":
         if default is not None:
             return default
-        raise ValueError(f"{field_name}が指定されていません")
+        raise ValueError(f"{field_name} is required")
     try:
         int_value = int(value)
     except (ValueError, TypeError):
-        raise ValueError(f"{field_name}は整数値である必要があります")
+        raise ValueError(f"{field_name} must be an integer")
     if min_value is not None and int_value < min_value:
-        raise ValueError(f"{field_name}は{min_value}以上である必要があります")
+        raise ValueError(f"{field_name} must be at least {min_value}")
     if max_value is not None and int_value > max_value:
-        raise ValueError(f"{field_name}は{max_value}以下である必要があります")
+        raise ValueError(f"{field_name} must be at most {max_value}")
     return int_value
 
 
