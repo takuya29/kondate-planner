@@ -1,0 +1,40 @@
+[
+  {
+    "date": "2025-11-08",
+    "meals": {
+      "breakfast": [
+        {"recipe_id": "recipe_001", "name": "味噌汁"},
+        {"recipe_id": "recipe_005", "name": "白米"}
+      ],
+      "lunch": [
+        {"recipe_id": "recipe_004", "name": "カレーライス"}
+      ],
+      "dinner": [
+        {"recipe_id": "recipe_002", "name": "鮭の塩焼き"},
+        {"recipe_id": "recipe_003", "name": "ほうれん草のおひたし"},
+        {"recipe_id": "recipe_005", "name": "白米"}
+      ]
+    },
+    "recipes": ["recipe_001", "recipe_005", "recipe_004", "recipe_002", "recipe_003"],
+    "notes": "バランスの良い献立",
+    "created_at": "2025-11-08T10:00:00",
+    "updated_at": "2025-11-08T10:00:00"
+  },
+  {
+    "date": "2025-11-07",
+    "meals": {
+      "breakfast": [
+        {"recipe_id": "recipe_001", "name": "味噌汁"}
+      ],
+      "lunch": [
+        {"recipe_id": "recipe_002", "name": "鮭の塩焼き"}
+      ],
+      "dinner": [
+        {"recipe_id": "recipe_004", "name": "カレーライス"}
+      ]
+    },
+    "recipes": ["recipe_001", "recipe_002", "recipe_004"],
+    "created_at": "2025-11-07T10:00:00",
+    "updated_at": "2025-11-07T10:00:00"
+  }
+]
