@@ -1,4 +1,4 @@
-# 献立作成補助ツール
+# Kondate Planner
 
 AWS SAMを使った個人利用の献立提案アプリケーションです。Amazon Bedrock Agentを使って、Slack経由で自然な会話形式で献立を提案します。
 
