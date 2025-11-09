@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-献立作成補助ツール (Menu Planning Assistant) - An AWS SAM serverless application that provides AI-powered meal planning using Amazon Bedrock Agents with Claude Sonnet 4.5. Users interact via Slack (through AWS Chatbot), and the agent suggests balanced meal plans based on available recipes and past menu history.
+Kondate Planner (Menu Planning Assistant) - An AWS SAM serverless application that provides AI-powered meal planning using Amazon Bedrock Agents. Users interact via Slack (through Amazon Q Developer), and the agent suggests balanced meal plans based on available recipes and past menu history.
 
-**Stack**: Python 3.12, AWS Lambda, Amazon Bedrock Agents, AWS Chatbot, Slack, DynamoDB
+**Stack**: Python 3.12, AWS Lambda, Amazon Bedrock Agents, Amazon Q Developer, Slack, DynamoDB
 **Region**: ap-northeast-1 (Tokyo)
 
 ## Architecture Overview
@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 User in Slack
     ↓
-AWS Chatbot (managed service - handles Slack integration)
+Amazon Q Developer (managed service - handles Slack integration)
     ↓
 Bedrock Agent (kondate-menu-planner)
     ↓
@@ -23,7 +23,7 @@ Action Lambdas (get_recipes, get_history, save_menu)
 DynamoDB (recipes, menu-history)
 ```
 
-AWS Chatbot handles all Slack integration, and the Bedrock Agent orchestrates Lambda actions via natural language understanding.
+Amazon Q Developer handles all Slack integration, and the Bedrock Agent orchestrates Lambda actions via natural language understanding.
 
 ## Build and Development Commands
 
@@ -65,7 +65,7 @@ aws cloudformation describe-stacks --stack-name kondate-planner \
 
 **Next steps:**
 1. Seed sample data (see "Data Management" section below)
-2. Test in Slack (see "AWS Chatbot / Developer Q Setup" section)
+2. Test in Slack (see "Amazon Q Developer Setup" section)
 
 ### Local Testing
 
@@ -240,7 +240,7 @@ The `template.yaml` automatically creates:
 
 1. **Bedrock Agent** (`KondateAgent`) with:
    - Agent name: `kondate-planner-agent`
-   - Model: Claude Sonnet 4.5 (via inference profile)
+   - Foundation Model (configurable via inference profile)
    - Complete agent instructions (embedded in template)
    - All three action groups with inline OpenAPI schemas:
      - `GetRecipes` → `GetRecipesActionFunction`
@@ -252,8 +252,8 @@ The `template.yaml` automatically creates:
    - Automatically linked to the latest agent version
 
 3. **IAM Role** (`BedrockAgentRole`) with:
-   - Permissions to invoke all action Lambda functions
-   - Access to Claude Sonnet 4.5 inference profile (cross-region)
+   - Permissions to invoke all Lambda functions
+   - Access to Foundation Model via inference profile (cross-region)
    - CloudWatch Logs access for debugging
 
 ### Viewing the Agent
@@ -276,15 +276,15 @@ To update the agent's behavior:
 
 **Note**: You can also modify instructions directly in the Bedrock console, but those changes will be overwritten on the next `sam deploy`. Always update `template.yaml` for persistent changes.
 
-## AWS Chatbot / Developer Q Setup
+## Amazon Q Developer Setup
 
-The Developer Q Slack channel is now managed via CloudFormation. Here's how to set it up:
+The Amazon Q Developer Slack channel is now managed via CloudFormation. Here's how to set it up:
 
 ### Prerequisites (One-Time Setup)
 
-**IMPORTANT**: Before deploying the CloudFormation stack, you must authorize your Slack workspace with AWS Chatbot:
+**IMPORTANT**: Before deploying the CloudFormation stack, you must authorize your Slack workspace with Amazon Q Developer:
 
-1. Go to **AWS Chatbot Console** → **Configure new client**
+1. Go to **Amazon Q Developer Console** → **Configure new client**
 2. Select **Slack**
 3. Click **Configure** and authorize your Slack workspace
 4. After authorization, note down your **Slack Workspace ID** (visible in the console)
@@ -298,27 +298,17 @@ The Developer Q Slack channel is now managed via CloudFormation. Here's how to s
 Deploy the stack with your Slack credentials:
 
 ```bash
-# Option 1: Via command line
 sam deploy --parameter-overrides \
   SlackWorkspaceId=YOUR_WORKSPACE_ID \
   SlackChannelId=YOUR_CHANNEL_ID
-
-# Option 2: Update samconfig.toml (DO NOT commit this file if public repo)
-# Add to [default.deploy.parameters]:
-# parameter_overrides = "SlackWorkspaceId=YOUR_WORKSPACE_ID SlackChannelId=YOUR_CHANNEL_ID"
 ```
-
-**Security Note**: The Slack IDs are sensitive. If using a public repository:
-- Use Option 1 (command line) for deployments
-- Or store IDs in AWS Systems Manager Parameter Store and reference them
-- Never commit actual IDs to `samconfig.toml` in a public repo
 
 ### What Gets Created
 
 The CloudFormation stack creates:
 
 1. **AWS::Chatbot::SlackChannelConfiguration** (`DeveloperQSlackChannel`)
-   - Links your Slack channel to AWS Chatbot
+   - Links your Slack channel to Amazon Q Developer
    - Connects to the Bedrock Agent alias
    - Uses the `AmazonQChatbotRole` IAM role
    - Uses `InvokeBedrockAgentPolicy` as guardrail
@@ -326,41 +316,42 @@ The CloudFormation stack creates:
 2. **Shared Policy** (`InvokeBedrockAgentPolicy`)
    - Used by both the IAM role AND the guardrail policy
    - Allows `bedrock:InvokeAgent`, `bedrock:GetAgent`, `bedrock:ListAgents`
-   - Scoped to all agents in the account (minimal scope needed for AWS Chatbot)
+   - Scoped to all agents in the account (minimal scope needed for Amazon Q Developer)
 
 3. **IAM Role** (`AmazonQChatbotRole`)
-   - Assumed by AWS Chatbot service
+   - Assumed by Amazon Q Developer service
    - Attached policies: `InvokeBedrockAgentPolicy` + `CloudWatchLogsReadOnlyAccess`
 
 ### Adding Bedrock Connector in Slack
 
 After deployment completes, you need to connect the Bedrock Agent to your Slack channel:
 
-**Step 1: Get Agent ID and Alias ID**
+**Step 1: Get Agent ARN and Alias ID**
 
+Option 1 - Via CLI:
 ```bash
 aws cloudformation describe-stacks --stack-name kondate-planner \
-  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
+  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentArn` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
   --output table
 ```
+
+Option 2 - Via Bedrock Agent Console:
+- Go to **Bedrock Agent Console** → **Agents** → **kondate-planner-agent**
+- Agent ARN is shown at the top of the agent details page
+- Alias ID can be found in the **Aliases** section (look for `production`)
 
 **Step 2: Add the connector in Slack**
 
 In your Slack channel, run:
 
 ```
-@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID
+@Amazon Q connector add kondate-planner <Agent ARN> <Alias ID>
 ```
 
 **Example**:
 ```
 @Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:123456789012:agent/ABCDEFGHIJ TESTALIASID
 ```
-
-Replace:
-- `YOUR_ACCOUNT_ID`: Your AWS account ID
-- `YOUR_AGENT_ID`: BedrockAgentId from Step 1
-- `YOUR_ALIAS_ID`: BedrockAgentAliasId from Step 1
 
 **Other useful commands**:
 - List connectors: `@Amazon Q connector list`
@@ -405,15 +396,17 @@ Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
 
 ### Amazon Bedrock Permissions
 
-**Model Access**: Claude Sonnet 4.5 via Inference Profile (cross-region)
+**Model Access**: Foundation Model via Inference Profile (cross-region)
 
-The Bedrock Agent Role must have permissions for:
+The Bedrock Agent Role must have permissions for the Foundation Model being used. When using Inference Profiles, permissions are needed for both the profile and the underlying foundation models in all relevant regions.
+
+**Example: Claude Sonnet 4.5 via Inference Profile**
 - **Inference Profile**: `arn:aws:bedrock:ap-northeast-1:{account}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0`
 - **Foundation Models** in both regions:
   - `arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0`
   - `arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0`
 
-This is already configured in the SAM template's `BedrockAgentRole`.
+The SAM template's `BedrockAgentRole` is pre-configured with these permissions.
 
 ### Date and Integer Validation
 
@@ -471,8 +464,8 @@ echo '{
 - Use the built-in test interface after preparing the agent
 - Provides detailed trace of action invocations
 
-**In Slack (via AWS Chatbot)**:
-- Mention `@Amazon Q` followed by your request
+**In Slack (via Amazon Q Developer)**:
+- Mention `@Amazon Q ask kondate-planner` followed by your request
 - Agent responses appear as threaded messages
 
 ### Common Test Scenarios
@@ -497,7 +490,7 @@ echo '{
 ## Common Pitfalls
 
 1. **Missing Slack Parameters**: Deployment will fail if you don't provide `SlackWorkspaceId` and `SlackChannelId` parameters
-2. **Slack Workspace Not Authorized**: You must authorize your Slack workspace in AWS Chatbot console BEFORE deploying the CloudFormation stack
+2. **Slack Workspace Not Authorized**: You must authorize your Slack workspace in Amazon Q Developer console BEFORE deploying the CloudFormation stack
 3. **Lambda Permissions**: Ensure Lambda resource-based policies allow `bedrock.amazonaws.com` to invoke (automatically configured in template)
 4. **Menu History Structure**: The `meals` field contains nested arrays - each meal type is an array of recipe objects
 5. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
@@ -510,8 +503,8 @@ echo '{
 When deploying to a new environment:
 
 ### First-Time Setup
-- [ ] Authorize Slack workspace in AWS Chatbot Console (one-time)
-- [ ] Get Slack Workspace ID from AWS Chatbot Console
+- [ ] Authorize Slack workspace in Amazon Q Developer Console (one-time)
+- [ ] Get Slack Workspace ID from Amazon Q Developer Console
 - [ ] Get Slack Channel ID from Slack (right-click channel > Copy Link)
 
 ### Deployment
@@ -520,8 +513,8 @@ When deploying to a new environment:
 - [ ] Verify stack outputs show all resources created
 
 ### Add Bedrock Connector
-- [ ] Get Agent ID and Alias ID: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentId\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
-- [ ] In Slack: `@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID`
+- [ ] Get Agent ARN and Alias ID: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentArn\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
+- [ ] In Slack: `@Amazon Q connector add kondate-planner <Agent ARN> <Alias ID>`
 
 ### Testing
 - [ ] Test in Slack: `@Amazon Q 3日分の献立を提案して`
