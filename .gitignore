@@ -79,5 +79,9 @@ credentials.json
 local/
 tmp/
 
+# Claude Code
+.claude/
+
+# AI assistants
 .gemini/
 gha-creds-*.json

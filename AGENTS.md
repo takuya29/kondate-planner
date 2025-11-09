@@ -23,7 +23,7 @@ Action Lambdas (get_recipes, get_history, save_menu)
 DynamoDB (recipes, menu-history)
 ```
 
-**Key Difference from Previous Architecture**: No REST API or custom Slack handler. AWS Chatbot handles all Slack integration, and the Bedrock Agent orchestrates Lambda actions via natural language understanding.
+AWS Chatbot handles all Slack integration, and the Bedrock Agent orchestrates Lambda actions via natural language understanding.
 
 ## Build and Development Commands
 
@@ -206,19 +206,21 @@ All action functions are designed for Bedrock Agent invocation (not API Gateway)
 Provides common utilities to all action functions:
 - **AWS Clients**: `dynamodb` and `bedrock` clients (initialized once)
 - **`decimal_to_float(obj)`**: Recursively converts DynamoDB `Decimal` to Python `float`/`int`
+- **`parse_bedrock_parameter(value, field_name)`**: Converts Bedrock Agent parameters from Python dict format to proper JSON objects
 - **`create_response()`**: Legacy function (not used by agent actions, kept for compatibility)
 
 **Note**: The layer structure is `src/layers/common/utils.py` (not nested in a `python/` subdirectory). SAM automatically packages this correctly for Lambda layer deployment.
 
-### OpenAPI Schemas (`src/schemas/`)
+### OpenAPI Schemas
 
-Define how the Bedrock Agent calls each Lambda action:
+**Current Implementation**: OpenAPI schemas are **embedded inline** in `template.yaml` (lines 159-365) as part of each action group definition. This allows CloudFormation to manage everything in a single file.
 
-- **`get-recipes.yaml`**: Defines `get_recipes` action
-- **`get-history.yaml`**: Defines `get_history` action
-- **`save-menu.yaml`**: Defines `save_menu` action
+**Legacy Schema Files** (`src/schemas/`): For reference only
+- `get-recipes.yaml` - Reference schema for get_recipes action
+- `get-history.yaml` - Reference schema for get_history action
+- `save-menu.yaml` - Reference schema for save_menu action
 
-**Important**: These schemas are the "instruction manual" for the agent. The `description` fields are critical - the agent reads them to understand when to use each action.
+**Important**: The schemas in `src/schemas/` are NOT used by the deployed agent. They serve as reference documentation only. All active schemas are defined inline in `template.yaml`. The `description` fields in the inline schemas are critical - the agent reads them to understand when to use each action.
 
 ### DynamoDB Schema
 
@@ -330,12 +332,46 @@ The CloudFormation stack creates:
    - Assumed by AWS Chatbot service
    - Attached policies: `InvokeBedrockAgentPolicy` + `CloudWatchLogsReadOnlyAccess`
 
-### Testing in Slack
+### Adding Bedrock Connector in Slack
 
-After deployment completes, test in your configured Slack channel:
+After deployment completes, you need to connect the Bedrock Agent to your Slack channel:
+
+**Step 1: Get Agent ID and Alias ID**
+
+```bash
+aws cloudformation describe-stacks --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs[?OutputKey==`BedrockAgentId` || OutputKey==`BedrockAgentAliasId`].[OutputKey,OutputValue]' \
+  --output table
+```
+
+**Step 2: Add the connector in Slack**
+
+In your Slack channel, run:
 
 ```
-@AWS 3日分の献立を提案して
+@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID
+```
+
+**Example**:
+```
+@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:123456789012:agent/ABCDEFGHIJ TESTALIASID
+```
+
+Replace:
+- `YOUR_ACCOUNT_ID`: Your AWS account ID
+- `YOUR_AGENT_ID`: BedrockAgentId from Step 1
+- `YOUR_ALIAS_ID`: BedrockAgentAliasId from Step 1
+
+**Other useful commands**:
+- List connectors: `@Amazon Q connector list`
+- Delete connector: `@Amazon Q connector delete kondate-planner`
+
+### Testing in Slack
+
+After adding the connector, test in your configured Slack channel:
+
+```
+@Amazon Q 3日分の献立を提案して
 ```
 
 The agent should:
@@ -357,6 +393,15 @@ sam deploy --parameter-overrides \
 CloudFormation will update the channel configuration without recreating other resources.
 
 ## Critical Implementation Details
+
+### Bedrock Agent Parameter Parsing
+
+Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
+```
+{lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
+```
+
+**Solution**: The shared layer includes `parse_bedrock_parameter()` utility (`utils.py`) that handles this conversion using regex-based transformation. This is used by `save_menu` action to parse the `meals` parameter. The conversion is transparent to the user but critical for reliability.
 
 ### Amazon Bedrock Permissions
 
@@ -427,7 +472,7 @@ echo '{
 - Provides detailed trace of action invocations
 
 **In Slack (via AWS Chatbot)**:
-- Mention `@AWS` followed by your request
+- Mention `@Amazon Q` followed by your request
 - Agent responses appear as threaded messages
 
 ### Common Test Scenarios
@@ -458,6 +503,7 @@ echo '{
 5. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
 6. **Explicit Confirmation**: Agent should NEVER call `save_menu` without user approval - this is critical for UX
 7. **Public Repository**: Never commit actual Slack IDs to `samconfig.toml` if using a public repo
+8. **Recipe Categories**: When adding custom recipes, use standard categories: `主菜` (main dish), `副菜` (side dish), `汁物` (soup), `主食` (staple/carbs), `デザート` (dessert)
 
 ## Deployment Checklist
 
@@ -473,8 +519,12 @@ When deploying to a new environment:
 - [ ] Run `sam deploy --parameter-overrides SlackWorkspaceId=XXX SlackChannelId=YYY`
 - [ ] Verify stack outputs show all resources created
 
+### Add Bedrock Connector
+- [ ] Get Agent ID and Alias ID: `aws cloudformation describe-stacks --stack-name kondate-planner --query 'Stacks[0].Outputs[?OutputKey==\`BedrockAgentId\` || OutputKey==\`BedrockAgentAliasId\`].[OutputKey,OutputValue]' --output table`
+- [ ] In Slack: `@Amazon Q connector add kondate-planner arn:aws:bedrock:ap-northeast-1:YOUR_ACCOUNT_ID:agent/YOUR_AGENT_ID YOUR_ALIAS_ID`
+
 ### Testing
-- [ ] Test in Slack: `@AWS 3日分の献立を提案して`
+- [ ] Test in Slack: `@Amazon Q 3日分の献立を提案して`
 - [ ] (Optional) Test in Bedrock console using the agent test interface
 
 ### Data Setup
