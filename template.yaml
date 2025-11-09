@@ -108,6 +108,7 @@ Resources:
       FoundationModel: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
       Description: Meal planning assistant for Japanese recipes
       IdleSessionTTLInSeconds: 600
+      AutoPrepare: true
       Instruction: |
         You are a helpful meal planning assistant that helps users create balanced Japanese meal plans.
 
