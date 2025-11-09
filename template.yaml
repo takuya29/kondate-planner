@@ -134,13 +134,28 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
-                Action: bedrock:InvokeModel
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
                 Resource:
                   # Inference Profile (cross-region)
                   - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
                   # Foundation models in both regions
                   - 'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
                   - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
+        - PolicyName: ReadAgentSchemas
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${AgentSchemasBucket.Arn}/*'
+                  - !GetAtt AgentSchemasBucket.Arn
 
   # ==================== Lambda Resource-based Policies (Allow Bedrock to invoke) ====================
   GetRecipesActionInvokePermission:
@@ -244,5 +259,6 @@ Outputs:
   SchemaUploadCommands:
     Description: "Commands to upload schemas to S3"
     Value: !Sub |
-      aws s3 cp src/schemas/recipe-management.yaml s3://${AgentSchemasBucket}/recipe-management.yaml
-      aws s3 cp src/schemas/history-management.yaml s3://${AgentSchemasBucket}/history-management.yaml
+      aws s3 cp src/schemas/get-recipes.yaml s3://${AgentSchemasBucket}/get-recipes.yaml
+      aws s3 cp src/schemas/get-history.yaml s3://${AgentSchemasBucket}/get-history.yaml
+      aws s3 cp src/schemas/save-menu.yaml s3://${AgentSchemasBucket}/save-menu.yaml

@@ -1,0 +1,97 @@
+openapi: 3.0.0
+info:
+  title: Get Menu History API
+  version: 1.0.0
+  description: Retrieve past menu history
+
+paths:
+  /get_history:
+    post:
+      operationId: getHistory
+      description: |
+        Retrieves menu history for the specified number of past days.
+
+        Use this action when:
+        - Planning new menus (to avoid repeating recent recipes)
+        - User asks about what they've been eating recently
+        - Need to ensure variety in meal planning
+
+        Returns a list of past menus with detailed meal structure and a flat
+        list of recipe IDs for easy deduplication checking.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: integer
+                  description: Number of days of history to retrieve (1-365, default 30)
+                  minimum: 1
+                  maximum: 365
+                  default: 30
+                  example: 30
+      responses:
+        '200':
+          description: List of menu history entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - history
+                properties:
+                  history:
+                    type: array
+                    description: Array of menu history entries, sorted by date (most recent first)
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          description: Date in YYYY-MM-DD format
+                          example: "2025-11-09"
+                        meals:
+                          type: object
+                          description: Detailed meal structure for the day
+                          properties:
+                            breakfast:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  recipe_id:
+                                    type: string
+                                  name:
+                                    type: string
+                            lunch:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  recipe_id:
+                                    type: string
+                                  name:
+                                    type: string
+                            dinner:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  recipe_id:
+                                    type: string
+                                  name:
+                                    type: string
+                        recipes:
+                          type: array
+                          description: Flat list of all recipe IDs used on this date (for deduplication)
+                          items:
+                            type: string
+                        notes:
+                          type: string
+                          description: Optional notes about the menu
+                  error:
+                    type: string
+                    description: Error message if something went wrong

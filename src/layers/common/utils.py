@@ -3,26 +3,22 @@ import boto3
 from decimal import Decimal
 
 # AWS Clients (initialized once)
-dynamodb = boto3.resource('dynamodb')
-bedrock = boto3.client('bedrock-runtime', region_name='ap-northeast-1')
+dynamodb = boto3.resource("dynamodb")
+bedrock = boto3.client("bedrock-runtime", region_name="ap-northeast-1")
 
 
 def create_response(status_code, body, is_json=True):
     """Creates a standard API Gateway response."""
     headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     }
     if is_json:
-        headers['Content-Type'] = 'application/json'
+        headers["Content-Type"] = "application/json"
         body = json.dumps(body, ensure_ascii=False)
 
-    return {
-        'statusCode': status_code,
-        'headers': headers,
-        'body': body
-    }
+    return {"statusCode": status_code, "headers": headers, "body": body}
 
 
 def decimal_to_float(obj):

@@ -54,8 +54,9 @@ aws cloudformation describe-stacks --stack-name kondate-planner \
   --query 'Stacks[0].Outputs[?OutputKey==`AgentSchemasBucketName`].OutputValue' --output text
 
 # Upload schemas
-aws s3 cp src/schemas/recipe-management.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/recipe-management.yaml
-aws s3 cp src/schemas/history-management.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/history-management.yaml
+aws s3 cp src/schemas/get-recipes.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/get-recipes.yaml
+aws s3 cp src/schemas/get-history.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/get-history.yaml
+aws s3 cp src/schemas/save-menu.yaml s3://kondate-agent-schemas-{YOUR-ACCOUNT-ID}/save-menu.yaml
 ```
 
 2. **Create Bedrock Agent** (see "Bedrock Agent Configuration" section below)
@@ -209,8 +210,9 @@ Provides common utilities to all action functions:
 
 Define how the Bedrock Agent calls each Lambda action:
 
-- **`recipe-management.yaml`**: Defines `get_recipes` action
-- **`history-management.yaml`**: Defines `get_history` and `save_menu` actions
+- **`get-recipes.yaml`**: Defines `get_recipes` action
+- **`get-history.yaml`**: Defines `get_history` action
+- **`save-menu.yaml`**: Defines `save_menu` action
 
 **Important**: These schemas are the "instruction manual" for the agent. The `description` fields are critical - the agent reads them to understand when to use each action.
 
@@ -272,29 +274,32 @@ TONE:
 
 ### Step 3: Add Action Groups
 
-**Action Group 1: RecipeManagement**
-- **Name**: `RecipeManagement`
-- **Description**: `Access to recipe database`
+**Action Group 1: GetRecipes**
+- **Name**: `GetRecipes`
+- **Description**: `Retrieve recipes from database`
 - **Lambda**: Select `GetRecipesActionFunction` from the list
 - **OpenAPI Schema**:
   - Select "S3 Object"
   - Bucket: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - Object key: `recipe-management.yaml`
+  - Object key: `get-recipes.yaml`
 
-**Action Group 2: HistoryManagement**
-- **Name**: `HistoryManagement`
-- **Description**: `Manage menu history`
+**Action Group 2: GetHistory**
+- **Name**: `GetHistory`
+- **Description**: `Retrieve menu history`
 - **Lambda**: Select `GetHistoryActionFunction` from the list
 - **OpenAPI Schema**:
   - Select "S3 Object"
   - Bucket: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - Object key: `history-management.yaml`
+  - Object key: `get-history.yaml`
 
-**Action Group 3: SaveHistory**
-- **Name**: `SaveHistory`
+**Action Group 3: SaveMenu**
+- **Name**: `SaveMenu`
 - **Description**: `Save approved menus`
 - **Lambda**: Select `SaveMenuActionFunction` from the list
-- **OpenAPI Schema**: Same as HistoryManagement (contains both actions)
+- **OpenAPI Schema**:
+  - Select "S3 Object"
+  - Bucket: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
+  - Object key: `save-menu.yaml`
 
 ### Step 4: Prepare and Test
 

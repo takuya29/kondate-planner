@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 
 from utils import dynamodb, decimal_to_float
 
@@ -7,7 +8,7 @@ from utils import dynamodb, decimal_to_float
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-RECIPES_TABLE = os.environ['RECIPES_TABLE']
+RECIPES_TABLE = os.environ["RECIPES_TABLE"]
 
 
 def lambda_handler(event, context):
@@ -16,51 +17,83 @@ def lambda_handler(event, context):
 
     Input (from agent):
         {
-            "category": "string (optional)"  # e.g., "主菜", "副菜", "汁物"
+            "messageVersion": "1.0",
+            "agent": {...},
+            "actionGroup": "...",
+            "function": "get_recipes",
+            "parameters": [
+                {"name": "category", "type": "string", "value": "主菜"}
+            ]
         }
 
     Output (to agent):
         {
-            "recipes": [
-                {
-                    "recipe_id": "uuid",
-                    "name": "string",
-                    "category": "string",
-                    "cooking_time": number,
-                    "ingredients": ["string"],
-                    "recipe_url": "string",
-                    "tags": ["string"]
+            "messageVersion": "1.0",
+            "response": {
+                "actionGroup": "...",
+                "function": "get_recipes",
+                "functionResponse": {
+                    "responseBody": {
+                        "TEXT": {
+                            "body": "{\"recipes\": [...]}"
+                        }
+                    }
                 }
-            ]
+            }
         }
     """
     try:
-        # Agent passes parameters directly in event (not wrapped in API Gateway format)
-        category = event.get('category')
+        # Log the full event for debugging
+        logger.info(f"Received event: {json.dumps(event)}")
+
+        # Extract parameters from Bedrock Agent event format
+        parameters = {p["name"]: p["value"] for p in event.get("parameters", [])}
+        category = parameters.get("category")
 
         logger.info(f"Getting recipes with category filter: {category}")
 
         table = dynamodb.Table(RECIPES_TABLE)
         response = table.scan()
-        recipes = decimal_to_float(response.get('Items', []))
+        recipes = decimal_to_float(response.get("Items", []))
 
         # Filter by category if specified
         if category:
-            recipes = [r for r in recipes if r.get('category') == category]
+            recipes = [r for r in recipes if r.get("category") == category]
             logger.info(f"Filtered to {len(recipes)} recipes in category '{category}'")
 
         # Sort by name for consistent ordering
-        recipes.sort(key=lambda x: x.get('name', ''))
+        recipes.sort(key=lambda x: x.get("name", ""))
 
-        # Return plain dict (agent handles serialization)
+        # Return in Bedrock Agent response format
         return {
-            'recipes': recipes
+            "messageVersion": "1.0",
+            "response": {
+                "actionGroup": event.get("actionGroup"),
+                "apiPath": event.get("apiPath"),
+                "httpMethod": event.get("httpMethod"),
+                "httpStatusCode": 200,
+                "responseBody": {
+                    "application/json": {
+                        "body": json.dumps({"recipes": recipes})
+                    }
+                }
+            }
         }
 
     except Exception as e:
         logger.error(f"Error getting recipes: {str(e)}", exc_info=True)
-        # Return error in agent-friendly format
+        # Return error in Bedrock Agent format
         return {
-            'error': str(e),
-            'recipes': []
+            "messageVersion": "1.0",
+            "response": {
+                "actionGroup": event.get("actionGroup"),
+                "apiPath": event.get("apiPath"),
+                "httpMethod": event.get("httpMethod"),
+                "httpStatusCode": 500,
+                "responseBody": {
+                    "application/json": {
+                        "body": json.dumps({"error": str(e), "recipes": []})
+                    }
+                }
+            }
         }

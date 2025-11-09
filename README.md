@@ -138,8 +138,9 @@ kondate-planner/
 │   │   └── common/
 │   │       └── utils.py
 │   └── schemas/               # OpenAPIスキーマ
-│       ├── recipe-management.yaml
-│       └── history-management.yaml
+│       ├── get-recipes.yaml
+│       ├── get-history.yaml
+│       └── save-menu.yaml
 ├── scripts/
 │   └── seed_data.py           # データ投入スクリプト
 └── README.md
@@ -187,8 +188,9 @@ BUCKET_NAME=$(aws cloudformation describe-stacks \
   --output text)
 
 # スキーマをアップロード
-aws s3 cp src/schemas/recipe-management.yaml s3://${BUCKET_NAME}/recipe-management.yaml
-aws s3 cp src/schemas/history-management.yaml s3://${BUCKET_NAME}/history-management.yaml
+aws s3 cp src/schemas/get-recipes.yaml s3://${BUCKET_NAME}/get-recipes.yaml
+aws s3 cp src/schemas/get-history.yaml s3://${BUCKET_NAME}/get-history.yaml
+aws s3 cp src/schemas/save-menu.yaml s3://${BUCKET_NAME}/save-menu.yaml
 ```
 
 ### 4. Bedrock Agentの作成
@@ -239,27 +241,29 @@ AWSコンソールでBedrockエージェントを作成します。
 
 #### 4-3. アクショングループの追加
 
-**アクショングループ1: RecipeManagement**
-- 名前: `RecipeManagement`
-- 説明: `レシピデータベースへのアクセス`
+**アクショングループ1: GetRecipes**
+- 名前: `GetRecipes`
+- 説明: `レシピデータベースの取得`
 - Lambda: `GetRecipesActionFunction` を選択
 - OpenAPIスキーマ: S3から選択
   - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - オブジェクトキー: `recipe-management.yaml`
+  - オブジェクトキー: `get-recipes.yaml`
 
-**アクショングループ2: HistoryManagement**
-- 名前: `HistoryManagement`
-- 説明: `献立履歴の管理`
+**アクショングループ2: GetHistory**
+- 名前: `GetHistory`
+- 説明: `献立履歴の取得`
 - Lambda: `GetHistoryActionFunction` を選択
 - OpenAPIスキーマ: S3から選択
   - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
-  - オブジェクトキー: `history-management.yaml`
+  - オブジェクトキー: `get-history.yaml`
 
-**アクショングループ3: SaveHistory**
-- 名前: `SaveHistory`
+**アクショングループ3: SaveMenu**
+- 名前: `SaveMenu`
 - 説明: `承認された献立の保存`
 - Lambda: `SaveMenuActionFunction` を選択
-- OpenAPIスキーマ: 同じ `history-management.yaml`
+- OpenAPIスキーマ: S3から選択
+  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
+  - オブジェクトキー: `save-menu.yaml`
 
 #### 4-4. エージェントの準備
 
