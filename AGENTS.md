@@ -319,16 +319,20 @@ The CloudFormation stack creates:
    - Links your Slack channel to AWS Chatbot
    - Connects to the Bedrock Agent alias
    - Uses the `AmazonQChatbotRole` IAM role
-   - Enables `ReadOnlyAccess` guardrail policy (safe for general use)
+   - Uses `InvokeBedrockAgentPolicy` as guardrail
 
-2. **IAM Role** (`AmazonQChatbotRole`)
-   - Allows invocation of the Bedrock Agent
-   - Read-only access to CloudWatch Logs
-   - Limited to Bedrock Agent actions only
+2. **Shared Policy** (`InvokeBedrockAgentPolicy`)
+   - Used by both the IAM role AND the guardrail policy
+   - Allows `bedrock:InvokeAgent`, `bedrock:GetAgent`, `bedrock:ListAgents`
+   - Scoped to all agents in the account (minimal scope needed for AWS Chatbot)
+
+3. **IAM Role** (`AmazonQChatbotRole`)
+   - Assumed by AWS Chatbot service
+   - Attached policies: `InvokeBedrockAgentPolicy` + `CloudWatchLogsReadOnlyAccess`
 
 ### Testing in Slack
 
-Once deployed, test in your configured Slack channel:
+After deployment completes, test in your configured Slack channel:
 
 ```
 @AWS 3日分の献立を提案して

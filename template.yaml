@@ -381,10 +381,8 @@ Resources:
       SlackWorkspaceId: !Ref SlackWorkspaceId
       SlackChannelId: !Ref SlackChannelId
       LoggingLevel: INFO
-      CustomizationResourceArns:
-        - !GetAtt KondateAgentAlias.AgentAliasArn
       GuardrailPolicies:
-        - arn:aws:iam::aws:policy/ReadOnlyAccess
+        - !Ref InvokeBedrockAgentPolicy
 
   # ==================== Amazon Q / Chatbot IAM Role ====================
   AmazonQChatbotRole:
@@ -400,19 +398,25 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/CloudWatchLogsReadOnlyAccess
-      Policies:
-        - PolicyName: InvokeBedrockAgent
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - bedrock:InvokeAgent
-                  - bedrock:GetAgent
-                  - bedrock:ListAgents
-                Resource:
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*/*'
+        - !Ref InvokeBedrockAgentPolicy
+
+  # ==================== Shared Bedrock Agent Policy ====================
+  InvokeBedrockAgentPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: kondate-invoke-bedrock-agent-policy
+      Description: Allow invocation of Bedrock Agent (used by both channel role and guardrail)
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - bedrock:InvokeAgent
+              - bedrock:GetAgent
+              - bedrock:ListAgents
+            Resource:
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*'
+              - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*/*'
 
   # ==================== Bedrock Agent IAM Role ====================
   BedrockAgentRole:
@@ -539,6 +543,10 @@ Outputs:
   DeveloperQSlackChannelArn:
     Description: "Developer Q Slack Channel Configuration ARN"
     Value: !Ref DeveloperQSlackChannel
+
+  InvokeBedrockAgentPolicyArn:
+    Description: "Bedrock Agent invocation policy ARN (used by both role and guardrail)"
+    Value: !Ref InvokeBedrockAgentPolicy
 
   # ==================== Setup Instructions ====================
   NextSteps:
