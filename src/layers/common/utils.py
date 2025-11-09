@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 import json
 import re
 import boto3
 from decimal import Decimal
+from typing import Any
+
+from mypy_boto3_dynamodb.service_resource import DynamoDBServiceResource
+from mypy_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 # AWS Clients (lazy-initialized to avoid import-time errors in test environments)
-_dynamodb = None
-_bedrock = None
+_dynamodb: DynamoDBServiceResource | None = None
+_bedrock: BedrockRuntimeClient | None = None
 
 
-def get_dynamodb():
+def get_dynamodb() -> DynamoDBServiceResource:
     """Get or create DynamoDB resource."""
     global _dynamodb
     if _dynamodb is None:
@@ -16,7 +22,7 @@ def get_dynamodb():
     return _dynamodb
 
 
-def get_bedrock():
+def get_bedrock() -> BedrockRuntimeClient:
     """Get or create Bedrock client."""
     global _bedrock
     if _bedrock is None:
@@ -24,9 +30,9 @@ def get_bedrock():
     return _bedrock
 
 
-def create_response(status_code, body, is_json=True):
+def create_response(status_code: int, body: Any, is_json: bool = True) -> dict[str, Any]:
     """Creates a standard API Gateway response."""
-    headers = {
+    headers: dict[str, str] = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -38,7 +44,7 @@ def create_response(status_code, body, is_json=True):
     return {"statusCode": status_code, "headers": headers, "body": body}
 
 
-def decimal_to_float(obj):
+def decimal_to_float(obj: Any) -> Any:
     """Recursively converts DynamoDB Decimal types to Python floats or ints."""
     if isinstance(obj, Decimal):
         return float(obj) if obj % 1 else int(obj)
@@ -49,7 +55,7 @@ def decimal_to_float(obj):
     return obj
 
 
-def parse_bedrock_parameter(value, field_name="parameter"):
+def parse_bedrock_parameter(value: Any, field_name: str = "parameter") -> Any:
     """
     Convert Bedrock Agent parameter format to proper Python object.
 
