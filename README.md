@@ -1,6 +1,6 @@
 # 献立作成補助ツール
 
-AWS SAMを使った個人利用の献立提案アプリケーションです。Amazon Bedrock AgentとClaude Sonnet 4.5を使って、Slack経由で自然な会話形式で献立を提案します。
+AWS SAMを使った個人利用の献立提案アプリケーションです。Amazon Bedrock Agentを使って、Slack経由で自然な会話形式で献立を提案します。
 
 ## 機能概要
 
@@ -22,7 +22,7 @@ graph TB
 
         subgraph Bedrock["Amazon Bedrock"]
             Agent[Bedrock Agent<br/>kondate-menu-planner]
-            Claude[Claude Sonnet 4.5<br/>Inference Profile]
+            Model[Foundation Model<br/>例: Claude Sonnet 4.5]
         end
 
         subgraph Lambda["Action Lambda Functions"]
@@ -40,7 +40,7 @@ graph TB
     User -->|メッセージ| Chatbot
     Chatbot -->|会話| Agent
 
-    Agent -->|推論| Claude
+    Agent -->|推論| Model
     Agent -->|アクション呼び出し| GetRecipes
     Agent -->|アクション呼び出し| GetHistory
     Agent -->|アクション呼び出し| SaveMenu
@@ -80,7 +80,7 @@ sequenceDiagram
     HistoryDB-->>GetHistory: 献立履歴
     GetHistory-->>Agent: 履歴リスト
 
-    Agent->>Agent: 献立プラン生成<br/>(Claude推論)
+    Agent->>Agent: 献立プラン生成<br/>(AI推論)
     Agent-->>Chatbot: 3日分の献立案
     Chatbot-->>User: 献立を表示<br/>「この献立で保存しますか?」
 
@@ -99,7 +99,7 @@ sequenceDiagram
 ## 技術スタック
 
 - **Lambda**: Python 3.12, ARM64
-- **Bedrock Agent**: Claude Sonnet 4.5 (Inference Profile)
+- **Bedrock Agent**: Foundation Model経由でAI推論（例: Claude Sonnet 4.5）
 - **Amazon Q Developer**: Slack統合
 - **DynamoDB**: 2テーブル（recipes, menu_history）
 - **リージョン**: ap-northeast-1（東京）
@@ -142,17 +142,10 @@ kondate-planner/
 - AWS CLI設定済み
 - AWS SAM CLI インストール済み
 - Python 3.12
-- Amazon Bedrockのモデルアクセス許可（Claude Sonnet 4.5）
-- Slackワークスペース（AWS Chatbot連携用）
+- Amazon Bedrockのモデルアクセス許可
+- Slackワークスペース（Amazon Q Developer連携用）
 
-### 1. Bedrock モデルアクセスの有効化
-
-AWSコンソールで以下を実行：
-1. Amazon Bedrockコンソールを開く
-2. 「Model access」に移動
-3. 「Anthropic Claude Sonnet 4.5」のアクセスを有効化
-
-### 2. Slackワークスペースの認証（初回のみ）
+### 1. Slackワークスペースの認証（初回のみ）
 
 **重要**: デプロイ前に、Slackワークスペースを Amazon Q Developer に認証する必要があります：
 
@@ -165,7 +158,7 @@ AWSコンソールで以下を実行：
    - **Copy Link** を選択
    - URLの最後の部分がチャンネルID（例: `C12345ABCDE`）
 
-### 3. ビルドとデプロイ
+### 2. ビルドとデプロイ
 
 ```bash
 # ビルド
@@ -183,7 +176,7 @@ sam deploy
 
 **注意**: 公開リポジトリの場合、Slack IDを `samconfig.toml` にコミットしないでください。コマンドラインで指定するか、AWS Systems Manager Parameter Store を使用してください。
 
-### 4. デプロイの確認
+### 3. デプロイの確認
 
 デプロイが完了すると、以下が自動的に作成されます：
 
@@ -200,7 +193,7 @@ aws cloudformation describe-stacks --stack-name kondate-planner \
   --query 'Stacks[0].Outputs[?OutputKey==`DeveloperQSlackChannelArn`].OutputValue' --output text
 ```
 
-### 5. Bedrockエージェントの確認（オプション）
+### 4. Bedrockエージェントの確認（オプション）
 
 エージェントはCloudFormationで自動作成されますが、コンソールで確認できます：
 
@@ -211,7 +204,7 @@ aws cloudformation describe-stacks --stack-name kondate-planner \
 
 **注意**: エージェント指示を変更する場合は `template.yaml` を編集し、再デプロイしてください。コンソールでの変更は次回デプロイ時に上書きされます。
 
-### 6. サンプルデータの投入
+### 5. サンプルデータの投入
 
 ```bash
 # boto3をインストール（未インストールの場合）
@@ -221,7 +214,7 @@ pip install boto3
 python scripts/seed_data.py --recipes 20 --history 30
 ```
 
-### 7. SlackでBedrockコネクタを追加
+### 6. SlackでBedrockコネクタを追加
 
 デプロイ後、Slackチャンネルでエージェントに接続する必要があります：
 
@@ -248,12 +241,12 @@ Slackチャンネルで以下のコマンドを実行：
 - `YOUR_AGENT_ID`: 上記コマンドで取得したAgent ID
 - `YOUR_ALIAS_ID`: 上記コマンドで取得したAlias ID
 
-### 8. Slackで動作確認
+### 7. Slackで動作確認
 
 コネクタの追加が完了したら、設定したSlackチャンネルで:
 
 ```
-@Amazon Q 3日分の献立を提案して
+@Amazon Q ask kondate-planner 3日分の献立を提案して
 ```
 
 エージェントが以下を実行するはずです:
@@ -267,19 +260,19 @@ Slackチャンネルで以下のコマンドを実行：
 ### 献立の提案を受ける
 
 ```
-@Amazon Q 7日分の献立を提案してください
+@Amazon Q ask kondate-planner 7日分の献立を提案してください
 ```
 
 ### 最近の献立を確認
 
 ```
-@Amazon Q 最近の献立を見せて
+@Amazon Q ask kondate-planner最近の献立を見せて
 ```
 
 ### 特定カテゴリのレシピを見る
 
 ```
-@Amazon Q 主菜のレシピを教えて
+@Amazon Q ask kondate-planner 主菜のレシピを教えて
 ```
 
 ### 献立を保存
@@ -287,13 +280,13 @@ Slackチャンネルで以下のコマンドを実行：
 エージェントが献立を提案した後:
 
 ```
-保存して
+@Amazon Q 保存して
 ```
 
 または
 
 ```
-いいえ、もっと魚料理を増やして
+@Amazon Q いいえ、もっと魚料理を増やして
 ```
 
 ## データベーススキーマ
@@ -362,13 +355,14 @@ echo '{
 
 ### Bedrockモデルアクセスエラー
 
-**エラー**: "The provided model identifier is invalid"
+**エラー**: "The provided model identifier is invalid" や "Access denied"
 
 **対処法**:
-- Claude Sonnet 4.5は **Inference Profile経由でのみ** 呼び出し可能
-- 正しいモデルID: `jp.anthropic.claude-sonnet-4-5-20250929-v1:0`
+1. Amazon Bedrockコンソールで使用するモデルのアクセスが有効化されているか確認
+2. エージェントのIAMロールに適切なBedrock権限があるか確認
+3. Inference Profileを使用する場合、クロスリージョンのFoundation Modelへのアクセス権限も必要
 
-**IAM権限**: 以下のすべてに対する権限が必要:
+**例: Claude Sonnet 4.5を使用する場合の権限**:
 ```yaml
 Resource:
   - 'arn:aws:bedrock:ap-northeast-1:${AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
@@ -387,7 +381,7 @@ Resource:
 新しい環境にデプロイする際（すべて自動化済み）:
 
 ### 初回セットアップ
-- [ ] Amazon Bedrockで Claude Sonnet 4.5 のモデルアクセスを有効化
+- [ ] Amazon Bedrockで使用するFoundation Modelのアクセスを有効化
 - [ ] Amazon Q Developer ConsoleでSlackワークスペースを認証
 - [ ] Slack Workspace IDとChannel IDを取得
 
