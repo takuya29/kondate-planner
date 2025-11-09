@@ -411,6 +411,8 @@ Resources:
       AgentId: !GetAtt KondateAgent.AgentId
       AgentAliasName: production
       Description: Production alias with inference profile support
+      Tags:
+        LastAgentUpdate: !GetAtt KondateAgent.AgentVersion
 
   # ==================== Amazon Q Developer / Chatbot ====================
   DeveloperQSlackChannel:
