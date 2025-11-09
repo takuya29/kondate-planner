@@ -1,12 +1,13 @@
 # 献立作成補助ツール
 
-AWS SAMを使った個人利用の献立提案APIです。Amazon Bedrock (Claude Sonnet 4.5)を使って、レシピデータと献立履歴から最適な献立を提案します。
+AWS SAMを使った個人利用の献立提案アプリケーションです。Amazon Bedrock AgentとClaude Sonnet 4.5を使って、Slack経由で自然な会話形式で献立を提案します。
 
 ## 機能概要
 
-- **献立提案**: AI（Claude）が3日分または7日分の献立を提案
-- **レシピ管理**: レシピの作成・取得
-- **献立履歴**: 過去の献立履歴を保存・取得
+- **Slack経由の対話型献立提案**: AWS Chatbotを通じてSlackから自然言語で献立をリクエスト
+- **AI献立生成**: Bedrock Agentが過去の履歴を考慮してバランスの良い献立を提案
+- **履歴管理**: 過去の献立を参照し、同じレシピの繰り返しを避ける
+- **明示的な保存確認**: ユーザーが承認した献立のみを保存
 
 ## システムアーキテクチャ
 
@@ -14,17 +15,22 @@ AWS SAMを使った個人利用の献立提案APIです。Amazon Bedrock (Claude
 
 ```mermaid
 graph TB
-    Client[クライアント<br/>cURLなど]
+    User[ユーザー<br/>Slack]
 
     subgraph AWS["AWS Cloud (ap-northeast-1)"]
-        APIGW[API Gateway<br/>HTTP API]
+        Chatbot[AWS Chatbot<br/>Slack統合]
+
+        subgraph Bedrock["Amazon Bedrock"]
+            Agent[Bedrock Agent<br/>kondate-menu-planner]
+            Claude[Claude Sonnet 4.5<br/>Inference Profile]
+        end
+
         LambdaLayer[Lambda Layer<br/>共通ライブラリ]
 
-        subgraph Lambda["Lambda Functions (Python 3.12)"]
-            SuggestMenu[献立提案<br/>SuggestMenuFunction]
-            GetRecipes[レシピ取得<br/>GetRecipesFunction]
-            CreateRecipe[レシピ作成<br/>CreateRecipeFunction]
-            SaveHistory[履歴保存・取得<br/>SaveHistoryFunction]
+        subgraph Lambda["Action Lambda Functions"]
+            GetRecipes[レシピ取得<br/>GetRecipesAction]
+            GetHistory[履歴取得<br/>GetHistoryAction]
+            SaveMenu[献立保存<br/>SaveMenuAction]
         end
 
         subgraph Storage["データストア"]
@@ -32,205 +38,111 @@ graph TB
             HistoryDB[(DynamoDB<br/>kondate-menu-history)]
         end
 
-        Bedrock[Amazon Bedrock<br/>Claude Sonnet 4.5<br/>Inference Profile]
+        S3[S3 Bucket<br/>OpenAPIスキーマ]
     end
 
-    Client -->|HTTP Request| APIGW
+    User -->|メッセージ| Chatbot
+    Chatbot -->|会話| Agent
 
-    APIGW -->|POST /suggest| SuggestMenu
-    APIGW -->|GET /recipes| GetRecipes
-    APIGW -->|POST /recipes| CreateRecipe
-    APIGW -->|GET/POST /history| SaveHistory
+    Agent -->|推論| Claude
+    Agent -->|アクション呼び出し| GetRecipes
+    Agent -->|アクション呼び出し| GetHistory
+    Agent -->|アクション呼び出し| SaveMenu
 
-    LambdaLayer --> SuggestMenu
+    Agent -.->|スキーマ参照| S3
+
     LambdaLayer --> GetRecipes
-    LambdaLayer --> CreateRecipe
-    LambdaLayer --> SaveHistory
+    LambdaLayer --> GetHistory
+    LambdaLayer --> SaveMenu
 
-    SuggestMenu -->|全レシピ取得| RecipesDB
-    SuggestMenu -->|過去の履歴取得| HistoryDB
-    SuggestMenu -->|AI献立提案| Bedrock
+    GetRecipes -->|Scan| RecipesDB
+    GetHistory -->|GetItem| HistoryDB
+    SaveMenu -->|PutItem| HistoryDB
 
-    GetRecipes -->|レシピ取得/検索| RecipesDB
-    CreateRecipe -->|レシピ保存| RecipesDB
-
-    SaveHistory -->|履歴保存/取得| HistoryDB
-
-    APIGW -->|HTTP Response| Client
+    Chatbot -->|応答| User
 ```
 
-### APIフロー
+**旧アーキテクチャとの違い**: REST APIやカスタムSlackハンドラーは不要。AWS ChatbotがSlack統合を担当し、Bedrock Agentが自然言語理解とLambdaアクションの実行を統括します。
 
-#### 献立提案フロー
+### 対話フロー例
 
 ```mermaid
 sequenceDiagram
-    participant Client as クライアント
-    participant APIGW as API Gateway
-    participant Lambda as SuggestMenuFunction
+    participant User as ユーザー(Slack)
+    participant Chatbot as AWS Chatbot
+    participant Agent as Bedrock Agent
+    participant GetRecipes as GetRecipesAction
+    participant GetHistory as GetHistoryAction
+    participant SaveMenu as SaveMenuAction
     participant RecipesDB as recipes テーブル
     participant HistoryDB as menu_history テーブル
-    participant Bedrock as Amazon Bedrock
 
-    Client->>APIGW: POST /suggest<br/>{days: 3 or 7}
-    APIGW->>Lambda: イベント実行
+    User->>Chatbot: @AWS 3日分の献立を提案して
+    Chatbot->>Agent: ユーザーリクエスト
 
-    Lambda->>RecipesDB: 全レシピ取得<br/>Scan操作
-    RecipesDB-->>Lambda: レシピリスト
+    Agent->>GetRecipes: get_recipes()
+    GetRecipes->>RecipesDB: Scan
+    RecipesDB-->>GetRecipes: 全レシピ
+    GetRecipes-->>Agent: レシピリスト
 
-    Lambda->>HistoryDB: 過去30日の履歴取得<br/>Scan + フィルタ
-    HistoryDB-->>Lambda: 献立履歴
+    Agent->>GetHistory: get_history(days=30)
+    GetHistory->>HistoryDB: 過去30日分取得
+    HistoryDB-->>GetHistory: 献立履歴
+    GetHistory-->>Agent: 履歴リスト
 
-    Lambda->>Lambda: プロンプト構築<br/>・レシピ情報<br/>・過去の使用履歴<br/>・日数指定
+    Agent->>Agent: 献立プラン生成<br/>(Claude推論)
+    Agent-->>Chatbot: 3日分の献立案
+    Chatbot-->>User: 献立を表示<br/>「この献立で保存しますか?」
 
-    Lambda->>Bedrock: InvokeModel<br/>Claude Sonnet 4.5
-    Bedrock-->>Lambda: JSON形式の献立案
+    User->>Chatbot: はい、保存して
+    Chatbot->>Agent: 保存確認
 
-    Lambda->>Lambda: レスポンス整形
-    Lambda-->>APIGW: 献立プラン
-    APIGW-->>Client: JSON Response
+    Agent->>SaveMenu: save_menu(date, meals)
+    SaveMenu->>HistoryDB: PutItem
+    HistoryDB-->>SaveMenu: 保存完了
+    SaveMenu-->>Agent: 成功
+
+    Agent-->>Chatbot: 保存完了メッセージ
+    Chatbot-->>User: 「献立を保存しました」
 ```
-
-#### レシピ管理フロー
-
-```mermaid
-sequenceDiagram
-    participant Client as クライアント
-    participant APIGW as API Gateway
-    participant GetLambda as GetRecipesFunction
-    participant CreateLambda as CreateRecipeFunction
-    participant DB as recipes テーブル
-
-    Note over Client,DB: レシピ取得
-    Client->>APIGW: GET /recipes?category=メイン
-    APIGW->>GetLambda: イベント実行
-    GetLambda->>DB: Scan + フィルタリング
-    DB-->>GetLambda: レシピリスト
-    GetLambda-->>APIGW: レシピデータ
-    APIGW-->>Client: JSON Response
-
-    Note over Client,DB: レシピ作成
-    Client->>APIGW: POST /recipes<br/>{name, category, ...}
-    APIGW->>CreateLambda: イベント実行
-    CreateLambda->>CreateLambda: バリデーション<br/>ID生成<br/>タイムスタンプ追加
-    CreateLambda->>DB: PutItem操作
-    DB-->>CreateLambda: 保存完了
-    CreateLambda-->>APIGW: 作成されたレシピ
-    APIGW-->>Client: JSON Response
-```
-
-#### 献立履歴フロー
-
-```mermaid
-sequenceDiagram
-    participant Client as クライアント
-    participant APIGW as API Gateway
-    participant Lambda as SaveHistoryFunction
-    participant DB as menu_history テーブル
-
-    Note over Client,DB: 履歴取得
-    Client->>APIGW: GET /history?days=7
-    APIGW->>Lambda: イベント実行(GET)
-    Lambda->>Lambda: 日付範囲計算
-    Lambda->>DB: Scan + フィルタリング<br/>(過去N日分)
-    DB-->>Lambda: 履歴リスト
-    Lambda->>Lambda: 日付でソート
-    Lambda-->>APIGW: 履歴データ
-    APIGW-->>Client: JSON Response
-
-    Note over Client,DB: 履歴保存
-    Client->>APIGW: POST /history<br/>{date, meals, notes}
-    APIGW->>Lambda: イベント実行(POST)
-    Lambda->>Lambda: バリデーション<br/>recipe_id抽出<br/>タイムスタンプ追加
-    Lambda->>DB: PutItem操作
-    DB-->>Lambda: 保存完了
-    Lambda-->>APIGW: 保存された履歴
-    APIGW-->>Client: JSON Response
-```
-
-### データモデル関係
-
-```mermaid
-erDiagram
-    RECIPES ||--o{ MENU_HISTORY : "使用される"
-
-    RECIPES {
-        string recipe_id PK
-        string name
-        string category
-        number cooking_time
-        list ingredients
-        string recipe_url
-        list tags
-        string created_at
-        string updated_at
-    }
-
-    MENU_HISTORY {
-        string date PK
-        map meals
-        list recipes
-        string notes
-        string created_at
-        string updated_at
-    }
-
-    MEALS {
-        list breakfast
-        list lunch
-        list dinner
-    }
-
-    MENU_HISTORY ||--|| MEALS : "含む"
-```
-
-### コンポーネント説明
-
-| コンポーネント | 役割 | 主要機能 |
-|---------------|------|---------|
-| **API Gateway** | HTTPエンドポイント提供 | ルーティング、CORS設定 |
-| **Lambda Layer** | 共通コードの提供 | レスポンス整形、AWSクライアント初期化など |
-| **SuggestMenuFunction** | AI献立提案 | レシピ取得、履歴分析、Bedrock連携 |
-| **GetRecipesFunction** | レシピ参照 | カテゴリフィルタ、一覧取得 |
-| **CreateRecipeFunction** | レシピ登録 | バリデーション、ID生成 |
-| **SaveHistoryFunction** | 履歴管理 | 保存・取得、日付フィルタリング |
-| **DynamoDB (recipes)** | レシピ永続化 | NoSQLストレージ |
-| **DynamoDB (menu_history)** | 履歴永続化 | 日付ベースの履歴管理 |
-| **Amazon Bedrock** | AI推論 | Claude Sonnet 4.5による献立生成 |
 
 ## 技術スタック
 
-- **Lambda**: Python 3.12
-- **API Gateway**: HTTP API
+- **Lambda**: Python 3.12, ARM64
+- **Bedrock Agent**: Claude Sonnet 4.5 (Inference Profile)
+- **AWS Chatbot**: Slack統合
 - **DynamoDB**: 2テーブル（recipes, menu_history）
-- **Amazon Bedrock**: Claude Sonnet 4.5
+- **S3**: OpenAPIスキーマ保存
 - **リージョン**: ap-northeast-1（東京）
 
 ## プロジェクト構成
 
 ```
 kondate-planner/
-├── template.yaml          # SAMテンプレート
-├── samconfig.toml         # デプロイ設定
+├── template.yaml              # SAMテンプレート
+├── samconfig.toml             # デプロイ設定
+├── AGENTS.md                  # アーキテクチャドキュメント（詳細）
+├── CLAUDE.md -> AGENTS.md     # シンボリックリンク
 ├── src/
-│   ├── layers/            # 共通Lambda Layer
+│   ├── agent_actions/         # Bedrock Agent用Lambda
+│   │   ├── get_recipes/
+│   │   │   ├── app.py
+│   │   │   └── requirements.txt
+│   │   ├── get_history/
+│   │   │   ├── app.py
+│   │   │   └── requirements.txt
+│   │   └── save_menu/
+│   │       ├── app.py
+│   │       └── requirements.txt
+│   ├── layers/                # 共通Lambda Layer
 │   │   └── common/
-│   │       └── python/
-│   │           └── utils.py
-│   ├── suggest_menu/      # 献立提案Lambda
-│   │   ├── app.py
-│   │   └── requirements.txt
-│   ├── get_recipes/       # レシピ一覧取得Lambda
-│   │   ├── app.py
-│   │   └── requirements.txt
-│   ├── create_recipe/     # レシピ作成Lambda
-│   │   ├── app.py
-│   │   └── requirements.txt
-│   └── save_history/      # 献立履歴保存・取得Lambda
-│       ├── app.py
-│       └── requirements.txt
+│   │       └── utils.py
+│   └── schemas/               # OpenAPIスキーマ
+│       ├── get-recipes.yaml
+│       ├── get-history.yaml
+│       └── save-menu.yaml
 ├── scripts/
-│   └── seed_data.py       # データ投入スクリプト
+│   └── seed_data.py           # データ投入スクリプト
 └── README.md
 ```
 
@@ -242,6 +154,7 @@ kondate-planner/
 - AWS SAM CLI インストール済み
 - Python 3.12
 - Amazon Bedrockのモデルアクセス許可（Claude Sonnet 4.5）
+- Slackワークスペース（AWS Chatbot連携用）
 
 ### 1. Bedrock モデルアクセスの有効化
 
@@ -263,9 +176,122 @@ sam deploy --guided
 sam deploy
 ```
 
-### 3. サンプルデータの投入
+### 3. OpenAPIスキーマのアップロード
 
-デプロイが完了したら、サンプルデータを投入します：
+デプロイ後、スキーマファイルをS3にアップロードします：
+
+```bash
+# スタック出力からバケット名を取得
+BUCKET_NAME=$(aws cloudformation describe-stacks \
+  --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs[?OutputKey==`AgentSchemasBucketName`].OutputValue' \
+  --output text)
+
+# スキーマをアップロード
+aws s3 cp src/schemas/get-recipes.yaml s3://${BUCKET_NAME}/get-recipes.yaml
+aws s3 cp src/schemas/get-history.yaml s3://${BUCKET_NAME}/get-history.yaml
+aws s3 cp src/schemas/save-menu.yaml s3://${BUCKET_NAME}/save-menu.yaml
+```
+
+### 4. Bedrock Agentの作成
+
+AWSコンソールでBedrockエージェントを作成します。
+
+#### 4-1. エージェントの基本設定
+
+1. Amazon Bedrockコンソール → Agents → Create agent
+2. **エージェント名**: `kondate-menu-planner`
+3. **説明**: `日本料理の献立計画アシスタント`
+4. **モデル**: `Claude Sonnet 4.5`
+5. **IAMロール**: デプロイ時の出力 `BedrockAgentRoleArn` を使用
+
+#### 4-2. エージェント指示の設定
+
+以下をエージェント指示欄に貼り付け：
+
+```
+あなたはバランスの取れた日本食の献立計画を支援する親切なアシスタントです。
+
+利用可能なレシピと履歴:
+- get_recipes() を呼び出して利用可能なレシピを確認できます。カテゴリでフィルタすることも可能です。
+- get_history() を呼び出して最近の献立（デフォルト30日）を確認できます。レシピの重複を避けるために使用してください。
+
+献立計画のルール:
+献立を提案する際は以下を守ってください:
+1. 朝食: 1-2品（例: ご飯+味噌汁、トースト+サラダ）
+2. 昼食: 1-3品（バランス食またはお弁当スタイル）
+3. 夕食: 2-3品（主菜+副菜+汁物が一般的）
+4. バリエーション: 連続する日で同じ主要タンパク質を繰り返さない
+5. バランス: 可能な限り毎食に野菜を含める
+6. 調理時間: 短時間レシピ(<30分)と手の込んだレシピをミックス
+
+ワークフロー:
+1. ユーザーが献立提案を求めたら、レシピと最近の履歴を取得
+2. 要求された日数（通常3日または7日）の献立プランを生成
+3. レシピ名とカテゴリを含めて献立を明確に提示
+4. 「この献立で保存しますか？」と尋ねる
+5. ユーザーが明示的に確認した場合のみ save_menu() を呼び出す（はい/保存して/良さそう等）
+6. ユーザーが拒否または変更を求めた場合は、フィードバックに基づいて再生成
+
+トーン:
+- フレンドリーで会話的に
+- ユーザーの言語（日本語または英語）で応答
+- 関連する場合は簡単な調理のヒントや栄養情報を提供
+```
+
+#### 4-3. アクショングループの追加
+
+**アクショングループ1: GetRecipes**
+- 名前: `GetRecipes`
+- 説明: `レシピデータベースの取得`
+- Lambda: `GetRecipesActionFunction` を選択
+- OpenAPIスキーマ: S3から選択
+  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
+  - オブジェクトキー: `get-recipes.yaml`
+
+**アクショングループ2: GetHistory**
+- 名前: `GetHistory`
+- 説明: `献立履歴の取得`
+- Lambda: `GetHistoryActionFunction` を選択
+- OpenAPIスキーマ: S3から選択
+  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
+  - オブジェクトキー: `get-history.yaml`
+
+**アクショングループ3: SaveMenu**
+- 名前: `SaveMenu`
+- 説明: `承認された献立の保存`
+- Lambda: `SaveMenuActionFunction` を選択
+- OpenAPIスキーマ: S3から選択
+  - バケット: `kondate-agent-schemas-{YOUR-ACCOUNT-ID}`
+  - オブジェクトキー: `save-menu.yaml`
+
+#### 4-4. エージェントの準備
+
+1. 「Prepare」ボタンをクリック（約2分）
+2. テストコンソールで動作確認:
+   - 「3日分の献立を提案して」
+   - 「最近の献立を見せて」
+3. **Alias**を作成（例: `production`）
+
+### 5. AWS Chatbotの設定
+
+#### 5-1. Slackワークスペースの接続
+
+1. AWS Chatbotコンソールを開く
+2. 「Configure new client」→ **Slack** を選択
+3. Slackワークスペースを認証
+4. チャンネルを選択（例: `#kondate-planner`）
+
+#### 5-2. Bedrock Agent統合
+
+1. チャンネル設定で:
+   - 「Amazon Bedrock Agent」を有効化
+   - エージェント: `kondate-menu-planner` を選択
+   - エイリアス: `production`（または `DRAFT`）を選択
+2. IAMロール権限:
+   - `AmazonBedrockFullAccess` を付与（またはエージェント専用のスコープポリシー）
+
+### 6. サンプルデータの投入
 
 ```bash
 # boto3をインストール（未インストールの場合）
@@ -275,161 +301,52 @@ pip install boto3
 python scripts/seed_data.py --recipes 20 --history 30
 ```
 
-## API エンドポイント
+### 7. Slackでテスト
 
-デプロイ後、以下のエンドポイントが利用可能になります：
+設定したSlackチャンネルで:
 
-### 1. 献立提案
-
-**POST** `/suggest`
-
-```bash
-curl -X POST https://YOUR_API_ENDPOINT/prod/suggest \
-  -H "Content-Type: application/json" \
-  -d '{"days": 3}'
+```
+@AWS 3日分の献立を提案して
 ```
 
-リクエストボディ：
-```json
-{
-  "days": 3  // 3 or 7
-}
+エージェントが以下を実行するはずです:
+1. レシピを取得
+2. 最近の履歴を取得
+3. バランスの良い3日分の献立を生成
+4. 保存前に確認を求める
+
+## 使い方
+
+### 献立の提案を受ける
+
+```
+@AWS 7日分の献立を提案してください
 ```
 
-レスポンス例：
-```json
-{
-  "menu_plan": [
-    {
-      "date": "2025-11-07",
-      "meals": {
-        "breakfast": [
-          {"recipe_id": "recipe_011", "name": "トースト"},
-          {"recipe_id": "recipe_010", "name": "卵焼き"}
-        ],
-        "lunch": [
-          {"recipe_id": "recipe_015", "name": "チャーハン"}
-        ],
-        "dinner": [
-          {"recipe_id": "recipe_001", "name": "カレーライス"},
-          {"recipe_id": "recipe_009", "name": "味噌汁"},
-          {"recipe_id": "recipe_013", "name": "サラダ"}
-        ]
-      },
-      "notes": "バランスの良い献立"
-    }
-  ],
-  "summary": "3日間の献立提案"
-}
+### 最近の献立を確認
+
+```
+@AWS 最近の献立を見せて
 ```
 
-### 2. レシピ一覧取得
+### 特定カテゴリのレシピを見る
 
-**GET** `/recipes`
-
-```bash
-curl https://YOUR_API_ENDPOINT/prod/recipes
-
-# カテゴリでフィルタ
-curl https://YOUR_API_ENDPOINT/prod/recipes?category=メイン
+```
+@AWS 主菜のレシピを教えて
 ```
 
-### 3. レシピ作成
+### 献立を保存
 
-**POST** `/recipes`
+エージェントが献立を提案した後:
 
-```bash
-curl -X POST https://YOUR_API_ENDPOINT/prod/recipes \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "新しいレシピ",
-    "category": "メイン",
-    "cooking_time": 30,
-    "ingredients": ["材料1", "材料2"],
-    "recipe_url": "https://example.com/recipe/123",
-    "tags": ["和食"]
-  }'
+```
+保存して
 ```
 
-### 4. 献立履歴保存
+または
 
-**POST** `/history`
-
-```bash
-curl -X POST https://YOUR_API_ENDPOINT/prod/history \
-  -H "Content-Type: application/json" \
-  -d '{
-    "date": "2025-11-07",
-    "meals": {
-      "breakfast": [
-        {"recipe_id": "recipe_011", "name": "トースト"},
-        {"recipe_id": "recipe_010", "name": "卵焼き"}
-      ],
-      "lunch": [
-        {"recipe_id": "recipe_015", "name": "チャーハン"}
-      ],
-      "dinner": [
-        {"recipe_id": "recipe_001", "name": "カレーライス"},
-        {"recipe_id": "recipe_009", "name": "味噌汁"}
-      ]
-    },
-    "notes": "美味しかった"
-  }'
 ```
-
-### 5. 献立履歴取得
-
-**GET** `/history`
-
-```bash
-curl https://YOUR_API_ENDPOINT/prod/history
-
-# 過去7日分のみ取得
-curl https://YOUR_API_ENDPOINT/prod/history?days=7
-```
-
-## ローカル開発
-
-### ローカルでAPIを起動
-
-```bash
-sam local start-api
-```
-
-APIは `http://localhost:3000` で起動します。
-
-### Lambda関数を個別にテスト
-
-```bash
-# 献立提案のテスト
-echo '{"body": "{\"days\": 3}"}' | sam local invoke SuggestMenuFunction
-
-# レシピ取得のテスト
-sam local invoke GetRecipesFunction
-```
-
-### DynamoDBローカル（オプション）
-
-ローカルでDynamoDBを使う場合：
-
-```bash
-# DynamoDB Localを起動
-docker run -p 8000:8000 amazon/dynamodb-local
-
-# テーブル作成
-aws dynamodb create-table \
-  --table-name kondate-recipes \
-  --attribute-definitions AttributeName=recipe_id,AttributeType=S \
-  --key-schema AttributeName=recipe_id,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST \
-  --endpoint-url http://localhost:8000
-
-aws dynamodb create-table \
-  --table-name kondate-menu-history \
-  --attribute-definitions AttributeName=date,AttributeType=S \
-  --key-schema AttributeName=date,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST \
-  --endpoint-url http://localhost:8000
+いいえ、もっと魚料理を増やして
 ```
 
 ## データベーススキーマ
@@ -440,7 +357,7 @@ aws dynamodb create-table \
 |-----------|-----|------|
 | recipe_id | String (PK) | レシピID |
 | name | String | レシピ名 |
-| category | String | カテゴリ（メイン、副菜、朝食、汁物など） |
+| category | String | カテゴリ（主菜、副菜、汁物、主食、デザート） |
 | cooking_time | Number | 調理時間（分） |
 | ingredients | List | 材料リスト |
 | recipe_url | String | レシピのURL |
@@ -453,43 +370,58 @@ aws dynamodb create-table \
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | date | String (PK) | 日付（YYYY-MM-DD） |
-| meals | Map | 食事情報。各食事（breakfast/lunch/dinner）は配列形式で、複数のレシピオブジェクト（recipe_id, name）を含む |
-| recipes | List | 使用したレシピIDのリスト（全食事の全レシピID） |
-| notes | String | メモ |
+| meals | Map | 食事情報。breakfast/lunch/dinnerの各配列にレシピオブジェクト（recipe_id, name）を含む |
+| recipes | List | 使用したレシピIDのフラットリスト（重複排除用） |
+| notes | String | メモ（オプション） |
 | created_at | String | 作成日時 |
 | updated_at | String | 更新日時 |
 
+## ローカル開発とテスト
+
+### Lambda関数を個別にテスト
+
+```bash
+# レシピ取得のテスト
+echo '{"category": "主菜"}' | sam local invoke GetRecipesActionFunction
+
+# 履歴取得のテスト
+echo '{"days": 7}' | sam local invoke GetHistoryActionFunction
+
+# 献立保存のテスト
+echo '{
+  "date": "2025-11-09",
+  "meals": {
+    "breakfast": [{"recipe_id": "abc", "name": "味噌汁"}],
+    "lunch": [{"recipe_id": "def", "name": "カレー"}],
+    "dinner": [{"recipe_id": "ghi", "name": "焼き魚"}]
+  }
+}' | sam local invoke SaveMenuActionFunction
+```
+
+注: ローカルテストにはAWSのDynamoDBテーブルが必要です（DynamoDB Localは未対応）
+
 ## トラブルシューティング
 
-### Bedrock InvokeModel エラー
+### エージェントがアクションを見つけられない
 
-#### 1. モデルアクセスの確認
+1. OpenAPIスキーマがS3に正しくアップロードされているか確認
+2. エージェントのアクショングループ設定でスキーマパスが正しいか確認
+3. エージェントを「Prepare」し直す
 
-Bedrockのモデルアクセスが有効になっているか確認してください：
+### Lambdaが呼び出されない
 
-```bash
-aws bedrock list-foundation-models --region ap-northeast-1 \
-  --by-provider anthropic
-```
+1. Lambda関数のリソースベースポリシーで `bedrock.amazonaws.com` からの呼び出しが許可されているか確認（SAMテンプレートで自動設定）
+2. CloudWatch Logsでエラーを確認
 
-#### 2. Inference Profile の使用（重要）
+### Bedrockモデルアクセスエラー
 
-Claude Sonnet 4.5などの新しいモデルは、**Inference Profile経由でのみ呼び出し可能**です。
+**エラー**: "The provided model identifier is invalid"
 
-利用可能なInference Profileを確認：
-```bash
-aws bedrock list-inference-profiles --region ap-northeast-1
-```
+**対処法**:
+- Claude Sonnet 4.5は **Inference Profile経由でのみ** 呼び出し可能
+- 正しいモデルID: `jp.anthropic.claude-sonnet-4-5-20250929-v1:0`
 
-**正しいモデルID**: `jp.anthropic.claude-sonnet-4-5-20250929-v1:0` (Inference Profile)
-
-❌ 間違い: `anthropic.claude-sonnet-4-5-v2:0` (存在しない)
-❌ 間違い: `anthropic.claude-sonnet-4-5-20250929-v1:0` (直接モデルID - 使用不可)
-
-#### 3. IAM権限の設定
-
-Inference Profileは複数リージョンのモデルにルーティングするため、以下の**すべて**に対する権限が必要です：
-
+**IAM権限**: 以下のすべてに対する権限が必要:
 ```yaml
 Resource:
   - 'arn:aws:bedrock:ap-northeast-1:${AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
@@ -497,53 +429,57 @@ Resource:
   - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
 ```
 
-Inference Profileがap-northeast-1とap-northeast-3の両方にルーティングする場合、両リージョンのモデルへのアクセス権限が必要です。
+### AWS Chatbotが応答しない
 
-#### 4. エラーメッセージの例と対処法
+1. Chatbot設定でBedrockエージェントが正しく選択されているか確認
+2. ChatbotのIAMロールがエージェント呼び出し権限を持っているか確認
+3. Slackチャンネルで `@AWS` メンションをつけているか確認
 
-**エラー1**: "The provided model identifier is invalid"
-- 原因: 間違ったモデルIDを使用
-- 対処: Inference Profile IDを使用する
+## デプロイチェックリスト
 
-**エラー2**: "Invocation of model ID with on-demand throughput isn't supported"
-- 原因: 直接モデルIDでの呼び出し
-- 対処: Inference Profile IDを使用する
+新しい環境にデプロイする際:
 
-**エラー3**: "User is not authorized to perform: bedrock:InvokeModel on resource: arn:aws:bedrock:ap-northeast-3::foundation-model/..."
-- 原因: ルーティング先リージョンのモデルへの権限不足
-- 対処: 両リージョンのモデルARNを権限に追加する
+- [ ] `sam build && sam deploy --guided` を実行
+- [ ] スタック出力からS3バケット名を確認
+- [ ] OpenAPIスキーマをS3にアップロード
+- [ ] Bedrockコンソールでエージェントを作成（スタック出力のARNを使用）
+- [ ] アクショングループを正しいLambda ARNで追加
+- [ ] エージェントを「Prepare」
+- [ ] Bedrockコンソールでエージェントをテスト
+- [ ] エージェントエイリアス（`production`）を作成
+- [ ] AWS ChatbotでSlackワークスペースを設定
+- [ ] Chatbotをエージェントエイリアスに接続
+- [ ] Slackチャンネルでエンドツーエンドテスト
+- [ ] サンプルデータを投入: `python scripts/seed_data.py --recipes 20 --history 30`
 
-### DynamoDB アクセスエラー
+## 今後の拡張予定
 
-Lambda関数のIAMロールにDynamoDBアクセス権限があることを確認してください。SAMテンプレートに定義されています。
-
-### デプロイエラー
-
-S3バケットが必要な場合：
-
-```bash
-# 自動でS3バケットを作成してデプロイ
-sam deploy --resolve-s3
-
-# または手動でバケット作成
-aws s3 mb s3://your-sam-deployment-bucket --region ap-northeast-1
-sam deploy --s3-bucket your-sam-deployment-bucket
-```
+- レシピデータソースをDynamoDBからNotion APIに移行
+- 大規模データセット向けのページネーション対応
+- 複数週の献立計画サポート
+- レシピ材料を使った栄養分析
+- 食事制限や好みのサポート
 
 ## クリーンアップ
 
-リソースを削除する場合：
+すべてのリソースを削除する場合:
 
 ```bash
+# SAMスタックの削除
 sam delete
+
+# 手動作成したリソースも削除
+# - Bedrock Agent（コンソールから）
+# - AWS Chatbot設定（コンソールから）
 ```
-
-## ライセンス
-
-個人利用のプロジェクトです。
 
 ## 参考リンク
 
 - [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
-- [Amazon Bedrock Documentation](https://docs.aws.amazon.com/bedrock/)
+- [Amazon Bedrock Agents Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html)
+- [AWS Chatbot Documentation](https://docs.aws.amazon.com/chatbot/)
 - [DynamoDB Documentation](https://docs.aws.amazon.com/dynamodb/)
+
+## 詳細ドキュメント
+
+アーキテクチャの詳細やLambda関数の実装詳細については、[AGENTS.md](./AGENTS.md) を参照してください。

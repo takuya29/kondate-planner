@@ -1,0 +1,207 @@
+openapi: 3.0.0
+info:
+  title: Menu History Management API
+  version: 1.0.0
+  description: Manage menu history - retrieve past menus and save new ones
+
+paths:
+  /get_history:
+    post:
+      operationId: getHistory
+      description: |
+        Retrieves menu history for the specified number of past days.
+
+        Use this action when:
+        - Planning new menus (to avoid repeating recent recipes)
+        - User asks about what they've been eating recently
+        - Need to ensure variety in meal planning
+
+        Returns a list of past menus with detailed meal structure and a flat
+        list of recipe IDs for easy deduplication checking.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                days:
+                  type: integer
+                  description: Number of days of history to retrieve (1-365, default 30)
+                  minimum: 1
+                  maximum: 365
+                  default: 30
+                  example: 30
+      responses:
+        '200':
+          description: List of menu history entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - history
+                properties:
+                  history:
+                    type: array
+                    description: Array of menu history entries, sorted by date (most recent first)
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          description: Date in YYYY-MM-DD format
+                          example: "2025-11-09"
+                        meals:
+                          type: object
+                          description: Detailed meal structure for the day
+                          properties:
+                            breakfast:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  recipe_id:
+                                    type: string
+                                  name:
+                                    type: string
+                            lunch:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  recipe_id:
+                                    type: string
+                                  name:
+                                    type: string
+                            dinner:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  recipe_id:
+                                    type: string
+                                  name:
+                                    type: string
+                        recipes:
+                          type: array
+                          description: Flat list of all recipe IDs used on this date (for deduplication)
+                          items:
+                            type: string
+                        notes:
+                          type: string
+                          description: Optional notes about the menu
+                  error:
+                    type: string
+                    description: Error message if something went wrong
+
+  /save_menu:
+    post:
+      operationId: saveMenu
+      description: |
+        Saves a menu plan to history for a specific date.
+
+        IMPORTANT: Only call this action AFTER the user has explicitly confirmed
+        they want to save the menu. Wait for user approval before saving.
+
+        Use this action when:
+        - User says "yes", "save it", "looks good", "保存して", etc.
+        - User explicitly approves the suggested menu
+
+        Do NOT call this action if:
+        - User hasn't reviewed the menu yet
+        - User asks for changes or regeneration
+        - User says no or seems uncertain
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - date
+                - meals
+              properties:
+                date:
+                  type: string
+                  format: date
+                  description: Date for this menu in YYYY-MM-DD format
+                  example: "2025-11-09"
+                meals:
+                  type: object
+                  description: Meal structure for the day
+                  required:
+                    - breakfast
+                    - lunch
+                    - dinner
+                  properties:
+                    breakfast:
+                      type: array
+                      description: Breakfast recipes (1-2 items)
+                      items:
+                        type: object
+                        required:
+                          - recipe_id
+                          - name
+                        properties:
+                          recipe_id:
+                            type: string
+                            description: Recipe ID from the recipes database
+                          name:
+                            type: string
+                            description: Recipe name
+                    lunch:
+                      type: array
+                      description: Lunch recipes (1-3 items)
+                      items:
+                        type: object
+                        required:
+                          - recipe_id
+                          - name
+                        properties:
+                          recipe_id:
+                            type: string
+                          name:
+                            type: string
+                    dinner:
+                      type: array
+                      description: Dinner recipes (2-3 items)
+                      items:
+                        type: object
+                        required:
+                          - recipe_id
+                          - name
+                        properties:
+                          recipe_id:
+                            type: string
+                          name:
+                            type: string
+                notes:
+                  type: string
+                  description: Optional notes about this menu
+                  example: "Balanced menu with variety of proteins"
+      responses:
+        '200':
+          description: Save result
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - message
+                properties:
+                  success:
+                    type: boolean
+                    description: Whether the save was successful
+                  date:
+                    type: string
+                    format: date
+                    description: The date that was saved
+                  message:
+                    type: string
+                    description: Success or error message
+                  error:
+                    type: string
+                    description: Detailed error message if success is false
