@@ -15,14 +15,9 @@ Parameters:
     AllowedPattern: "^[A-Za-z0-9]+$"
     ConstraintDescription: "Must be a valid Slack channel ID"
 
-  BedrockModelId:
-    Type: String
-    Description: "Bedrock foundation model ID (used for IAM permissions)"
-    Default: "anthropic.claude-sonnet-4-5-20250929-v1:0"
-
   BedrockInferenceProfile:
     Type: String
-    Description: "Bedrock inference profile ARN or ID (cross-region routing)"
+    Description: "Bedrock inference profile ID (cross-region routing)"
     Default: "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 Globals:
@@ -509,10 +504,11 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource:
-                  # Inference Profile (cross-region)
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockInferenceProfile}'
-                  # Foundation models - allow access to the specified model in all regions
-                  - !Sub 'arn:aws:bedrock:*::foundation-model/${BedrockModelId}'
+                  # Allow any inference profile in this account
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
+                  # Allow any foundation model in any region
+                  # Note: Cross-region inference profiles may invoke models in other regions
+                  - 'arn:aws:bedrock:*::foundation-model/*'
 
   # ==================== Lambda Resource-based Policies (Allow Bedrock to invoke) ====================
   GetRecipesActionInvokePermission:
@@ -598,14 +594,10 @@ Outputs:
     Value: !Ref InvokeBedrockAgentPolicy
 
   # ==================== Model Configuration ====================
-  CurrentBedrockModel:
-    Description: "Current Bedrock foundation model ID"
-    Value: !Ref BedrockModelId
-
   CurrentInferenceProfile:
     Description: "Current inference profile"
     Value: !Ref BedrockInferenceProfile
 
-  FoundationModelArn:
+  InferenceProfileArn:
     Description: "Full ARN of the inference profile being used"
     Value: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockInferenceProfile}'
