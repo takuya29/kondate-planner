@@ -269,12 +269,29 @@ After deployment, you can view and test the agent in the Bedrock console:
 
 To update the agent's behavior:
 
-1. Edit the `Instruction` field in `template.yaml` (lines 98-153)
+1. Edit the `Instruction` field in `template.yaml` (lines 117-174)
 2. Run `sam build && sam deploy`
 3. CloudFormation will update the agent automatically
 4. The agent will auto-prepare with the new instructions
 
 **Note**: You can also modify instructions directly in the Bedrock console, but those changes will be overwritten on the next `sam deploy`. Always update `template.yaml` for persistent changes.
+
+### Switching Foundation Models
+
+The agent uses an inference profile (cross-region routing) for better availability. To switch models:
+
+**Deploy with different model**:
+```bash
+sam deploy --parameter-overrides \
+  BedrockInferenceProfile="jp.anthropic.claude-haiku-4-5-20251001-v1:0"
+```
+
+**Common models**:
+- `jp.anthropic.claude-sonnet-4-5-20250929-v1:0` - Claude Sonnet 4.5 (default, highest quality)
+- `jp.anthropic.claude-haiku-4-5-20251001-v1:0` - Claude Haiku 4.5 (cost-effective)
+- `apac.anthropic.claude-3-haiku-20240307-v1:0` - Claude 3 Haiku (lower cost)
+
+No IAM permission updates needed - the role allows all models and inference profiles.
 
 ## Amazon Q Developer Setup
 
@@ -398,15 +415,17 @@ Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
 
 **Model Access**: Foundation Model via Inference Profile (cross-region)
 
-The Bedrock Agent Role must have permissions for the Foundation Model being used. When using Inference Profiles, permissions are needed for both the profile and the underlying foundation models in all relevant regions.
+The Bedrock Agent Role has permissions to access:
+- **Any inference profile** in your account: `inference-profile/*`
+- **Any foundation model** in any region: `foundation-model/*`
 
-**Example: Claude Sonnet 4.5 via Inference Profile**
-- **Inference Profile**: `arn:aws:bedrock:ap-northeast-1:{account}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0`
-- **Foundation Models** in both regions:
-  - `arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0`
-  - `arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0`
+This allows you to switch between any Bedrock model without needing to update IAM permissions. The role is appropriately scoped (inference profiles limited to your account) while allowing flexible model selection.
 
-The SAM template's `BedrockAgentRole` is pre-configured with these permissions.
+**Configurable via Parameter**: Set `BedrockInferenceProfile` parameter during deployment to use different models:
+- Default: `jp.anthropic.claude-sonnet-4-5-20250929-v1:0` (Claude Sonnet 4.5)
+- Example: `jp.anthropic.claude-haiku-4-5-20251001-v1:0` (Claude Haiku 4.5 for cost savings)
+
+**Note**: Cross-region inference profiles may invoke models in other regions, which is why the policy allows foundation models in all regions (`arn:aws:bedrock:*::foundation-model/*`).
 
 ### Date and Integer Validation
 

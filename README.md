@@ -159,7 +159,6 @@ sam deploy --parameter-overrides \
 ```bash
 # Claude Haiku 4.5を使用（コスト重視）
 sam deploy --parameter-overrides \
-  BedrockModelId="anthropic.claude-haiku-4-5-20251001-v1:0" \
   BedrockInferenceProfile="jp.anthropic.claude-haiku-4-5-20251001-v1:0"
 ```
 
