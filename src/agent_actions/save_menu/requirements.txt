@@ -1,1 +1,6 @@
+# Dependencies for SaveMenuAction Lambda function
+# Note: Common utilities (boto3, type stubs) are provided by the shared layer
+# This function only uses standard library + layer utilities
+
+# AWS SDK - explicitly declared for clarity (also provided by layer)
 boto3>=1.28.0

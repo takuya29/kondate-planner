@@ -1,0 +1,9 @@
+# Dependencies for Common Lambda Layer
+# This layer provides shared utilities for all Lambda functions
+
+# AWS SDK
+boto3>=1.28.0
+
+# Type stubs for boto3 services (for type checking and IDE support)
+mypy-boto3-dynamodb>=1.28.0
+mypy-boto3-bedrock-runtime>=1.28.0
