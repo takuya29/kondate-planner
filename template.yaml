@@ -15,6 +15,16 @@ Parameters:
     AllowedPattern: "^[A-Za-z0-9]+$"
     ConstraintDescription: "Must be a valid Slack channel ID"
 
+  BedrockModelId:
+    Type: String
+    Description: "Bedrock foundation model ID (used for IAM permissions)"
+    Default: "anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+  BedrockInferenceProfile:
+    Type: String
+    Description: "Bedrock inference profile ARN or ID (cross-region routing)"
+    Default: "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
 Globals:
   Function:
     Runtime: python3.12
@@ -105,7 +115,7 @@ Resources:
     Properties:
       AgentName: kondate-planner-agent
       AgentResourceRoleArn: !GetAtt BedrockAgentRole.Arn
-      FoundationModel: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
+      FoundationModel: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockInferenceProfile}'
       Description: Meal planning assistant for Japanese recipes
       IdleSessionTTLInSeconds: 600
       AutoPrepare: true
@@ -407,7 +417,6 @@ Resources:
 
   KondateAgentAlias:
     Type: AWS::Bedrock::AgentAlias
-    DependsOn: KondateAgent
     Properties:
       AgentId: !GetAtt KondateAgent.AgentId
       AgentAliasName: production
@@ -501,10 +510,9 @@ Resources:
                   - bedrock:GetFoundationModel
                 Resource:
                   # Inference Profile (cross-region)
-                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/jp.anthropic.claude-sonnet-4-5-20250929-v1:0'
-                  # Foundation models in both regions
-                  - 'arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
-                  - 'arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockInferenceProfile}'
+                  # Foundation models - allow access to the specified model in all regions
+                  - !Sub 'arn:aws:bedrock:*::foundation-model/${BedrockModelId}'
 
   # ==================== Lambda Resource-based Policies (Allow Bedrock to invoke) ====================
   GetRecipesActionInvokePermission:
@@ -588,3 +596,16 @@ Outputs:
   InvokeBedrockAgentPolicyArn:
     Description: "Bedrock Agent invocation policy ARN (used by both role and guardrail)"
     Value: !Ref InvokeBedrockAgentPolicy
+
+  # ==================== Model Configuration ====================
+  CurrentBedrockModel:
+    Description: "Current Bedrock foundation model ID"
+    Value: !Ref BedrockModelId
+
+  CurrentInferenceProfile:
+    Description: "Current inference profile"
+    Value: !Ref BedrockInferenceProfile
+
+  FoundationModelArn:
+    Description: "Full ARN of the inference profile being used"
+    Value: !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockInferenceProfile}'
