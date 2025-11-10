@@ -30,7 +30,9 @@ def get_bedrock() -> BedrockRuntimeClient:
     return _bedrock
 
 
-def create_response(status_code: int, body: Any, is_json: bool = True) -> dict[str, Any]:
+def create_response(
+    status_code: int, body: Any, is_json: bool = True
+) -> dict[str, Any]:
     """Creates a standard API Gateway response."""
     headers: dict[str, str] = {
         "Access-Control-Allow-Origin": "*",
