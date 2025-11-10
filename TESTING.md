@@ -98,15 +98,19 @@ pylint src/ tests/
 ### MyPy (Type Checking)
 
 ```bash
-mypy src/ --explicit-package-bases
+mypy src/ --explicit-package-bases --strict
 ```
 
-**Note**: The `--explicit-package-bases` flag is required to handle multiple `app.py` files in different directories without duplicate module errors.
+**Note**:
+- The `--explicit-package-bases` flag is required to handle multiple `app.py` files in different directories without duplicate module errors.
+- The `--strict` flag enables all strict type checking options for maximum type safety.
+- All source code has complete type annotations and passes strict mode checking.
+- boto3-stubs are installed to provide type hints for AWS SDK calls (DynamoDB, Bedrock Runtime).
 
 ### Run All Linters
 
 ```bash
-black --check src/ tests/ && flake8 src/ tests/ && pylint src/ tests/ && mypy src/ --explicit-package-bases
+black --check src/ tests/ && flake8 src/ tests/ && pylint src/ tests/ && mypy src/ --explicit-package-bases --strict
 ```
 
 ## Test Coverage

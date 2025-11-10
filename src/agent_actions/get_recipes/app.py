@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import os
 import logging
 import json
+from typing import Any
 
 from utils import get_dynamodb, decimal_to_float
 
@@ -11,7 +14,7 @@ logger.setLevel(logging.INFO)
 RECIPES_TABLE = os.environ["RECIPES_TABLE"]
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
     Bedrock Agent action to get all recipes, with optional category filtering.
 

@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import os
 import logging
 import json
 from datetime import datetime, timedelta
+from typing import Any
 
 from utils import get_dynamodb, decimal_to_float
 
@@ -13,8 +16,12 @@ HISTORY_TABLE = os.environ["HISTORY_TABLE"]
 
 
 def safe_int_conversion(
-    value, field_name, min_value=None, max_value=None, default=None
-):
+    value: Any,
+    field_name: str,
+    min_value: int | None = None,
+    max_value: int | None = None,
+    default: int | None = None,
+) -> int:
     """Safely convert a value to an integer with validation."""
     if value is None or value == "":
         if default is not None:
@@ -31,7 +38,7 @@ def safe_int_conversion(
     return int_value
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
     Bedrock Agent action to get menu history.
 

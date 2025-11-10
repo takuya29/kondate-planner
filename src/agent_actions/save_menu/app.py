@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import os
 import logging
 import json
 from datetime import datetime
+from typing import Any
 
 from utils import get_dynamodb, decimal_to_float, parse_bedrock_parameter
 
@@ -12,7 +15,7 @@ logger.setLevel(logging.INFO)
 HISTORY_TABLE = os.environ["HISTORY_TABLE"]
 
 
-def validate_date_format(date_string):
+def validate_date_format(date_string: str) -> bool:
     """Validate date format (YYYY-MM-DD)."""
     try:
         datetime.strptime(date_string, "%Y-%m-%d")
@@ -21,7 +24,7 @@ def validate_date_format(date_string):
         return False
 
 
-def lambda_handler(event, context):
+def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
     """
     Bedrock Agent action to save menu history.
 
