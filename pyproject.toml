@@ -67,6 +67,7 @@ warn_unused_ignores = true
 warn_no_return = true
 follow_imports = "normal"
 ignore_missing_imports = false
+mypy_path = "src/layers/common"
 
 [[tool.mypy.overrides]]
 module = "tests.*"
