@@ -154,6 +154,14 @@ sam deploy --parameter-overrides \
   SlackChannelId=YOUR_CHANNEL_ID
 ```
 
+**コスト削減のヒント**: デフォルトではClaude Sonnet 4.5を使用しますが、Claude Haiku 4.5に切り替えることで**大幅なコスト削減**が可能です：
+
+```bash
+# Claude Haiku 4.5を使用（コスト重視）
+sam deploy --parameter-overrides \
+  BedrockInferenceProfile="jp.anthropic.claude-haiku-4-5-20251001-v1:0"
+```
+
 ### 3. サンプルデータの投入
 
 ```bash
