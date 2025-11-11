@@ -43,13 +43,18 @@ def clear_table(table_name: str, key_name: str) -> int:
         logger.info(f"'{table_name}' テーブルからデータを削除中...")
 
         # Scan all items
-        response = table.scan(ProjectionExpression=key_name)
+        # Use ExpressionAttributeNames to handle reserved keywords like 'date'
+        response = table.scan(
+            ProjectionExpression="#key",
+            ExpressionAttributeNames={"#key": key_name}
+        )
         items = response.get("Items", [])
 
         # Handle pagination
         while "LastEvaluatedKey" in response:
             response = table.scan(
-                ProjectionExpression=key_name,
+                ProjectionExpression="#key",
+                ExpressionAttributeNames={"#key": key_name},
                 ExclusiveStartKey=response["LastEvaluatedKey"],
             )
             items.extend(response.get("Items", []))
