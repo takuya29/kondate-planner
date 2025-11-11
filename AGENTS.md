@@ -269,12 +269,31 @@ After deployment, you can view and test the agent in the Bedrock console:
 
 To update the agent's behavior:
 
-1. Edit the `Instruction` field in `template.yaml` (lines 117-174)
+1. Edit the `Instruction` field in `template.yaml` (lines 117-229)
 2. Run `sam build && sam deploy`
 3. CloudFormation will update the agent automatically
 4. The agent will auto-prepare with the new instructions
 
 **Note**: You can also modify instructions directly in the Bedrock console, but those changes will be overwritten on the next `sam deploy`. Always update `template.yaml` for persistent changes.
+
+### Agent Behavior and Features
+
+The agent includes several key features:
+
+**Date Awareness**:
+- Automatically calculates and communicates date ranges (e.g., "11月11日から11月13日の献立を提案します")
+- Handles relative dates like "明日から" (from tomorrow) and "来週" (next week)
+- Always displays specific dates in menu suggestions
+
+**Proactive Menu Checking**:
+- Checks for existing menus before suggesting new ones
+- Displays existing menu details if dates are already occupied
+- Asks user confirmation before proceeding with new suggestions
+
+**Context and Insights**:
+- Provides seasonal ingredient suggestions (e.g., "秋なので、きのこ料理を入れました")
+- Considers recent eating patterns for balance (e.g., "最近肉が多かったので、魚料理を中心に")
+- Adjusts suggestions for weekends vs. weekdays
 
 ### Switching Foundation Models
 
