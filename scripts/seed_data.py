@@ -153,9 +153,8 @@ def create_recipes(table_name, count):
 
     recipes_to_create = SAMPLE_RECIPES[:count]
 
-    for i, recipe_data in enumerate(recipes_to_create):
+    for recipe_data in recipes_to_create:
         recipe = {
-            "recipe_id": f"recipe_{str(i+1).zfill(3)}",
             "name": recipe_data["name"],
             "category": recipe_data["category"],
             "ingredients": recipe_data["ingredients"],
@@ -202,9 +201,7 @@ def create_history(table_name, recipes_table_name, days):
         for j in range(breakfast_count):
             if j < len(selected_recipes):
                 r = selected_recipes[j]
-                breakfast_recipes.append(
-                    {"recipe_id": r["recipe_id"], "name": r["name"]}
-                )
+                breakfast_recipes.append(r["name"])
 
         # 昼食用（1-3品）
         lunch_count = random.randint(1, 3)
@@ -213,7 +210,7 @@ def create_history(table_name, recipes_table_name, days):
             idx = 2 + j
             if idx < len(selected_recipes):
                 r = selected_recipes[idx]
-                lunch_recipes.append({"recipe_id": r["recipe_id"], "name": r["name"]})
+                lunch_recipes.append(r["name"])
 
         # 夕食用（2-3品）
         dinner_count = random.randint(2, 3)
@@ -222,13 +219,13 @@ def create_history(table_name, recipes_table_name, days):
             idx = 5 + j
             if idx < len(selected_recipes):
                 r = selected_recipes[idx]
-                dinner_recipes.append({"recipe_id": r["recipe_id"], "name": r["name"]})
+                dinner_recipes.append(r["name"])
 
-        # 全レシピIDを収集
-        all_recipe_ids = []
-        all_recipe_ids.extend([r["recipe_id"] for r in breakfast_recipes])
-        all_recipe_ids.extend([r["recipe_id"] for r in lunch_recipes])
-        all_recipe_ids.extend([r["recipe_id"] for r in dinner_recipes])
+        # 全レシピ名を収集
+        all_recipe_names = []
+        all_recipe_names.extend(breakfast_recipes)
+        all_recipe_names.extend(lunch_recipes)
+        all_recipe_names.extend(dinner_recipes)
 
         history = {
             "date": date,
@@ -237,7 +234,7 @@ def create_history(table_name, recipes_table_name, days):
                 "lunch": lunch_recipes,
                 "dinner": dinner_recipes,
             },
-            "recipes": all_recipe_ids,
+            "recipes": all_recipe_names,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }

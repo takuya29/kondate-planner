@@ -106,11 +106,8 @@ class NotionDataSourceMigrator:
                 logger.warning(f"レシピ名が見つかりません: {page_id}")
                 return None
 
-            # recipe_idを生成 (ページIDの短縮版)
-            recipe_id = f"recipe_{page_id.replace('-', '')[:12]}"
-
-            # ページIDとrecipe_idのマッピングを保存
-            self.recipe_id_map[page_id] = recipe_id
+            # ページIDとnameのマッピングを保存 (献立履歴で使用)
+            self.recipe_id_map[page_id] = name
 
             # 分類 (select)
             category = self._get_select(props.get("分類")) or "その他"
@@ -122,7 +119,6 @@ class NotionDataSourceMigrator:
             recipe_url = self._get_url(props.get("URL")) or ""
 
             return {
-                "recipe_id": recipe_id,
                 "name": name,
                 "category": category,
                 "ingredients": ingredients,
@@ -176,25 +172,24 @@ class NotionDataSourceMigrator:
                 recipe_relations = self._get_relation(props.get("recipes"))
 
                 # レシピ情報を取得
-                recipe_items = []
+                recipe_names = []
                 for recipe_page_id in recipe_relations:
-                    # マップからrecipe_idを取得
-                    recipe_id = self.recipe_id_map.get(recipe_page_id)
-                    if recipe_id:
-                        # レシピ名を取得するためにページを取得
+                    # マップからrecipe name を取得
+                    recipe_name = self.recipe_id_map.get(recipe_page_id)
+                    if recipe_name:
+                        recipe_names.append(recipe_name)
+                    else:
+                        # マップにない場合はページを取得
                         try:
                             recipe_page = self.notion.pages.retrieve(page_id=recipe_page_id)
                             recipe_name = self._get_title(recipe_page["properties"].get("Name"))
                             if recipe_name:
-                                recipe_items.append({
-                                    "recipe_id": recipe_id,
-                                    "name": recipe_name
-                                })
+                                recipe_names.append(recipe_name)
                         except Exception as e:
                             logger.warning(f"レシピページ取得エラー: {recipe_page_id} - {str(e)}")
 
                 # この日付の食事に追加
-                meals_by_date[date][meal_key].extend(recipe_items)
+                meals_by_date[date][meal_key].extend(recipe_names)
 
             except Exception as e:
                 logger.error(f"✗ 献立解析エラー: {str(e)}")
@@ -204,15 +199,15 @@ class NotionDataSourceMigrator:
         # DynamoDB形式に変換
         history_items = []
         for date, meals in meals_by_date.items():
-            # 全レシピIDを収集
-            all_recipe_ids = []
+            # 全レシピ名を収集
+            all_recipe_names = []
             for meal_recipes in meals.values():
-                all_recipe_ids.extend([r["recipe_id"] for r in meal_recipes])
+                all_recipe_names.extend(meal_recipes)
 
             history_items.append({
                 "date": date,
                 "meals": meals,
-                "recipes": all_recipe_ids,
+                "recipes": all_recipe_names,
                 "notes": "",
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),

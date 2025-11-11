@@ -42,12 +42,12 @@ Resources:
       TableName: kondate-recipes
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: recipe_id
+        - AttributeName: name
           AttributeType: S
         - AttributeName: category
           AttributeType: S
       KeySchema:
-        - AttributeName: recipe_id
+        - AttributeName: name
           KeyType: HASH
       GlobalSecondaryIndexes:
         - IndexName: CategoryIndex
@@ -347,8 +347,6 @@ Resources:
                                   items:
                                     type: object
                                     properties:
-                                      recipe_id:
-                                        type: string
                                       name:
                                         type: string
                                       category:
@@ -410,25 +408,20 @@ Resources:
                                           breakfast:
                                             type: array
                                             items:
-                                              type: object
-                                              properties:
-                                                recipe_id:
-                                                  type: string
-                                                name:
-                                                  type: string
+                                              type: string
                                           lunch:
                                             type: array
                                             items:
-                                              type: object
+                                              type: string
                                           dinner:
                                             type: array
                                             items:
-                                              type: object
+                                              type: string
                                       recipes:
                                         type: array
                                         items:
                                           type: string
-                                        description: Flat list of all recipe IDs used this day
+                                        description: Flat list of all recipe names used this day
                                       notes:
                                         type: string
         - ActionGroupName: SaveMenu
@@ -472,29 +465,15 @@ Resources:
                                   breakfast:
                                     type: array
                                     items:
-                                      type: object
-                                      required:
-                                        - recipe_id
-                                        - name
-                                      properties:
-                                        recipe_id:
-                                          type: string
-                                        name:
-                                          type: string
+                                      type: string
                                   lunch:
                                     type: array
                                     items:
-                                      type: object
-                                      required:
-                                        - recipe_id
-                                        - name
+                                      type: string
                                   dinner:
                                     type: array
                                     items:
-                                      type: object
-                                      required:
-                                        - recipe_id
-                                        - name
+                                      type: string
                               notes:
                                 type: string
                                 description: Optional notes about this menu

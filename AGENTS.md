@@ -120,7 +120,6 @@ All action functions are designed for Bedrock Agent invocation (not API Gateway)
 {
   "recipes": [
     {
-      "recipe_id": "uuid",
       "name": "string",
       "category": "string",
       "ingredients": ["string"],
@@ -153,11 +152,11 @@ All action functions are designed for Bedrock Agent invocation (not API Gateway)
     {
       "date": "YYYY-MM-DD",
       "meals": {
-        "breakfast": [{"recipe_id": "...", "name": "..."}],
-        "lunch": [...],
-        "dinner": [...]
+        "breakfast": ["レシピ名1", "レシピ名2"],
+        "lunch": ["レシピ名1", "レシピ名2"],
+        "dinner": ["レシピ名1", "レシピ名2", "レシピ名3"]
       },
-      "recipes": ["recipe_id1", "recipe_id2"],  // Flat list for deduplication
+      "recipes": ["レシピ名1", "レシピ名2", "レシピ名3"],  // Flat list for deduplication
       "notes": "string (optional)"
     }
   ]
@@ -178,9 +177,9 @@ All action functions are designed for Bedrock Agent invocation (not API Gateway)
 {
   "date": "YYYY-MM-DD",
   "meals": {
-    "breakfast": [{"recipe_id": "...", "name": "..."}],
-    "lunch": [...],
-    "dinner": [...]
+    "breakfast": ["レシピ名1", "レシピ名2"],
+    "lunch": ["レシピ名1", "レシピ名2"],
+    "dinner": ["レシピ名1", "レシピ名2", "レシピ名3"]
   },
   "notes": "string (optional)"
 }
@@ -222,14 +221,22 @@ Provides common utilities to all action functions:
 
 ### DynamoDB Schema
 
-**kondate-recipes** (PK: recipe_id)
-- `name`, `category`, `ingredients[]`, `recipe_url`, `created_at`, `updated_at`
+**kondate-recipes** (PK: name)
+- Primary Key: `name` (recipe name is unique and human-readable)
+- Attributes: `category`, `ingredients[]`, `recipe_url`, `created_at`, `updated_at`
 - GSI: `CategoryIndex` (PK: category) - for efficient category filtering
 
 **kondate-menu-history** (PK: date as YYYY-MM-DD)
-- `meals` (Map): `{breakfast: [{recipe_id, name}], lunch: [...], dinner: [...]}`
-- `recipes[]`: Flat list of all recipe_ids used in that day (for deduplication)
+- `meals` (Map): `{breakfast: ["レシピ名1", ...], lunch: [...], dinner: [...]}`
+  - Each meal type is now a simple array of recipe names (strings)
+- `recipes[]`: Flat list of all recipe names used in that day (for deduplication)
 - `notes`, `created_at`, `updated_at`
+
+**Schema Simplification Benefits**:
+- ✅ Simpler structure: Recipe names instead of UUIDs
+- ✅ Human-readable: Easy to debug and inspect data
+- ✅ Agent-friendly: Works directly with names users understand
+- ✅ No ID generation needed during migration from Notion
 
 ## Bedrock Agent Configuration
 
@@ -424,10 +431,12 @@ CloudFormation will update the channel configuration without recreating other re
 
 Bedrock Agent sometimes sends parameters in Python dict format instead of JSON:
 ```
-{lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
+{lunch=[焼きそば, サラダ], breakfast=[...]}
 ```
 
 **Solution**: The shared layer includes `parse_bedrock_parameter()` utility (`utils.py`) that handles this conversion using regex-based transformation. This is used by `save_menu` action to parse the `meals` parameter. The conversion is transparent to the user but critical for reliability.
+
+**Note**: With the simplified schema (recipe names as strings instead of objects), parameter parsing is now simpler and more reliable.
 
 ### Amazon Bedrock Permissions
 
@@ -488,9 +497,9 @@ echo '{"days": 7}' | sam local invoke GetHistoryActionFunction
 echo '{
   "date": "2025-11-09",
   "meals": {
-    "breakfast": [{"recipe_id": "abc", "name": "味噌汁"}],
-    "lunch": [{"recipe_id": "def", "name": "カレー"}],
-    "dinner": [{"recipe_id": "ghi", "name": "焼き魚"}]
+    "breakfast": ["味噌汁", "納豆"],
+    "lunch": ["カレー"],
+    "dinner": ["焼き魚", "サラダ"]
   }
 }' | sam local invoke SaveMenuActionFunction
 ```
@@ -529,7 +538,7 @@ echo '{
 1. **Missing Slack Parameters**: Deployment will fail if you don't provide `SlackWorkspaceId` and `SlackChannelId` parameters
 2. **Slack Workspace Not Authorized**: You must authorize your Slack workspace in Amazon Q Developer console BEFORE deploying the CloudFormation stack
 3. **Lambda Permissions**: Ensure Lambda resource-based policies allow `bedrock.amazonaws.com` to invoke (automatically configured in template)
-4. **Menu History Structure**: The `meals` field contains nested arrays - each meal type is an array of recipe objects
+4. **Menu History Structure**: The `meals` field contains simple arrays - each meal type is an array of recipe names (strings)
 5. **Date Format**: History dates are `YYYY-MM-DD` strings (not ISO8601 timestamps)
 6. **Explicit Confirmation**: Agent should NEVER call `save_menu` without user approval - this is critical for UX
 7. **Public Repository**: Never commit actual Slack IDs to `samconfig.toml` if using a public repo
