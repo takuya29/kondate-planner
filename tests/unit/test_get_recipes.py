@@ -121,10 +121,6 @@ class TestGetRecipesAction:
         body_str = response["response"]["responseBody"]["application/json"]["body"]
         body = json.loads(body_str)
 
-        # Verify cooking_time is an int, not Decimal
-        for recipe in body["recipes"]:
-            assert isinstance(recipe["cooking_time"], int)
-
     def test_get_recipes_error_handling(
         self, mock_env_vars, bedrock_agent_event, get_recipes_handler
     ):

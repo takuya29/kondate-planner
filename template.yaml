@@ -353,18 +353,12 @@ Resources:
                                         type: string
                                       category:
                                         type: string
-                                      cooking_time:
-                                        type: number
                                       ingredients:
                                         type: array
                                         items:
                                           type: string
                                       recipe_url:
                                         type: string
-                                      tags:
-                                        type: array
-                                        items:
-                                          type: string
         - ActionGroupName: GetHistory
           Description: Retrieve menu history
           ActionGroupExecutor:

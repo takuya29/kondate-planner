@@ -123,10 +123,8 @@ All action functions are designed for Bedrock Agent invocation (not API Gateway)
       "recipe_id": "uuid",
       "name": "string",
       "category": "string",
-      "cooking_time": number,
       "ingredients": ["string"],
-      "recipe_url": "string",
-      "tags": ["string"]
+      "recipe_url": "string"
     }
   ]
 }
@@ -225,7 +223,8 @@ Provides common utilities to all action functions:
 ### DynamoDB Schema
 
 **kondate-recipes** (PK: recipe_id)
-- `name`, `category`, `cooking_time`, `ingredients[]`, `recipe_url`, `tags[]`, `created_at`, `updated_at`
+- `name`, `category`, `ingredients[]`, `recipe_url`, `created_at`, `updated_at`
+- GSI: `CategoryIndex` (PK: category) - for efficient category filtering
 
 **kondate-menu-history** (PK: date as YYYY-MM-DD)
 - `meals` (Map): `{breakfast: [{recipe_id, name}], lunch: [...], dinner: [...]}`
