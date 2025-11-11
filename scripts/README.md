@@ -37,6 +37,31 @@ python scripts/migrate_from_notion.py
 
 ---
 
+### `clear_dynamodb_data.py`
+Deletes all data from DynamoDB tables.
+
+```bash
+# Clear all tables (with confirmation prompt)
+python scripts/clear_dynamodb_data.py --all
+
+# Clear specific tables
+python scripts/clear_dynamodb_data.py --recipes
+python scripts/clear_dynamodb_data.py --history
+
+# Force delete without confirmation (use with caution!)
+python scripts/clear_dynamodb_data.py --all --force
+```
+
+**Options**:
+- `--all`: Clear both recipes and history tables
+- `--recipes`: Clear only recipes table
+- `--history`: Clear only history table
+- `--force`: Skip confirmation prompt
+
+**Warning**: This operation is irreversible. Always backup your data before clearing.
+
+---
+
 ### `deploy_and_update_agent.sh`
 Automated deployment script that builds, deploys, and updates the Bedrock Agent.
 
