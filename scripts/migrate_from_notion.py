@@ -121,20 +121,12 @@ class NotionDataSourceMigrator:
             # URL (url)
             recipe_url = self._get_url(props.get("URL")) or ""
 
-            # タグは空配列
-            tags = []
-
-            # 調理時間はデフォルト0
-            cooking_time = 0
-
             return {
                 "recipe_id": recipe_id,
                 "name": name,
                 "category": category,
-                "cooking_time": cooking_time,
                 "ingredients": ingredients,
                 "recipe_url": recipe_url,
-                "tags": tags,
                 "created_at": datetime.now().isoformat(),
                 "updated_at": datetime.now().isoformat(),
             }

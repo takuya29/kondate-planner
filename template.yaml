@@ -44,9 +44,18 @@ Resources:
       AttributeDefinitions:
         - AttributeName: recipe_id
           AttributeType: S
+        - AttributeName: category
+          AttributeType: S
       KeySchema:
         - AttributeName: recipe_id
           KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: CategoryIndex
+          KeySchema:
+            - AttributeName: category
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
 
   MenuHistoryTable:
     Type: AWS::DynamoDB::Table
@@ -142,13 +151,21 @@ Resources:
 
         MEAL PLANNING RULES:
         When generating menu suggestions:
-        1. Breakfast: 1-2 dishes (e.g., rice + miso soup, or toast + salad)
+        1. Breakfast: SKIP unless user explicitly requests it (user rarely cooks breakfast)
         2. Lunch: 1-3 dishes (balanced meal or bento-style)
-        3. Dinner: 2-3 dishes (main + side + soup is common)
-        4. Variety: Don't repeat the same main protein on consecutive days
-        5. Balance: Include vegetables in every meal when possible
-        6. Cooking time: Mix quick recipes (<30min) with more involved ones
+        3. Dinner: 2-3 dishes (main + side + soup is common) - FOCUS ON THIS
+        4. Variety across meals: Don't repeat the same main protein on consecutive days
+        5. Ingredient efficiency: Prefer recipes that share common ingredients to minimize shopping
+           - Example: If one recipe uses 鶏肉, suggest another 鶏肉 recipe for a different day
+           - Balance efficiency with variety - don't use the exact same ingredients for all meals
+        6. Balance: Include vegetables in dinner when possible
         7. Weekend vs weekday: Automatically adjust complexity (weekends = more elaborate recipes OK)
+        8. Available categories (from actual database):
+           - メイン (main dishes: meat, fish, noodles)
+           - 汁物 (soups: miso soup, consommé)
+           - その他 (other: sides, rice, misc)
+           - サラダ (salads)
+           - 副菜 (side dishes)
 
         RESPONSE FORMAT (IMPORTANT - For Slack compatibility):
         - Keep responses concise and well-structured
@@ -175,9 +192,9 @@ Resources:
              "既に献立が登録されている日があります：
 
              **11月11日:**
-             - 朝食: レシピ名1, レシピ名2
              - 昼食: レシピ名1, レシピ名2
              - 夕食: レシピ名1, レシピ名2, レシピ名3
+             (朝食は省略 - only show if breakfast exists in the data)
 
              新しい献立を提案しますか？"
            - Wait for user confirmation before proceeding
@@ -188,11 +205,12 @@ Resources:
            - Create balanced menu for requested days
            - Mention the date range: "MM月DD日からMM月DD日の献立を提案します"
 
-        4. Present the menu with specific dates:
+        4. Present the menu with specific dates (skip breakfast unless user explicitly requested it):
            **MM月DD日 (Day of week):**
-           - 朝食: レシピ名1, レシピ名2
            - 昼食: レシピ名1, レシピ名2
            - 夕食: レシピ名1, レシピ名2, レシピ名3
+
+           (Only include breakfast line if user explicitly asked for breakfast suggestions)
 
         5. Ask: "この献立で保存しますか？"
 
