@@ -91,13 +91,9 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         # DynamoDB batch_get_item has a limit of 100 items per request
         # Process in chunks of 100
         for i in range(0, len(date_keys), 100):
-            chunk = date_keys[i:i + 100]
+            chunk = date_keys[i : i + 100]
             response = dynamodb.batch_get_item(
-                RequestItems={
-                    HISTORY_TABLE: {
-                        "Keys": chunk
-                    }
-                }
+                RequestItems={HISTORY_TABLE: {"Keys": chunk}}
             )
 
             # Extract items from the response

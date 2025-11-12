@@ -8,7 +8,6 @@ disable=C0111,  # missing-docstring
         R0903,  # too-few-public-methods
         R0913,  # too-many-arguments
         W0212,  # protected-access
-        C0330,  # bad-continuation
 
 [FORMAT]
 max-line-length=88

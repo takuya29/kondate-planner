@@ -110,11 +110,7 @@ class TestDynamoDBIntegration:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "dinner": [main_dishes[0]["name"]]
-                                }
-                            ),
+                            "value": json.dumps({"dinner": [main_dishes[0]["name"]]}),
                         },
                     ]
                 }
@@ -157,11 +153,7 @@ class TestDynamoDBIntegration:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": ["新しい"]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["新しい"]}),
                         },
                     ]
                 }

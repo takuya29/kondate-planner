@@ -59,11 +59,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": ["味噌汁"]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["味噌汁"]}),
                         },
                         {
                             "name": "notes",
@@ -92,11 +88,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": ["味噌汁"]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["味噌汁"]}),
                         },
                     ]
                 }
@@ -126,11 +118,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": ["味噌汁"]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["味噌汁"]}),
                         },
                         {"name": "overwrite", "type": "boolean", "value": "true"},
                     ]

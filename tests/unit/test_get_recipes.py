@@ -98,9 +98,7 @@ class TestGetRecipesAction:
             dynamodb.create_table(
                 TableName=mock_env_vars["RECIPES_TABLE"],
                 KeySchema=[{"AttributeName": "name", "KeyType": "HASH"}],
-                AttributeDefinitions=[
-                    {"AttributeName": "name", "AttributeType": "S"}
-                ],
+                AttributeDefinitions=[{"AttributeName": "name", "AttributeType": "S"}],
                 BillingMode="PAY_PER_REQUEST",
             )
 
@@ -119,7 +117,8 @@ class TestGetRecipesAction:
         response = get_recipes_handler(event, None)
 
         body_str = response["response"]["responseBody"]["application/json"]["body"]
-        body = json.loads(body_str)
+        # Verify JSON can be parsed without Decimal serialization errors
+        json.loads(body_str)
 
     def test_get_recipes_error_handling(
         self, mock_env_vars, bedrock_agent_event, get_recipes_handler
