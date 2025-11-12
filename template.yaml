@@ -130,6 +130,15 @@ Resources:
         - Call get_recipes() to see all available recipes. You can optionally filter by category.
         - Call get_history() to see recent menus (default 30 days). Use this to avoid repeating recipes.
 
+        CRITICAL RECIPE CONSTRAINTS (MUST FOLLOW):
+        - You MUST ONLY suggest recipes that are returned by the get_recipes() action
+        - NEVER invent, create, or suggest recipes that are not present in the database
+        - Before suggesting any menu, verify that EVERY recipe name you plan to suggest exists in the get_recipes() response
+        - If you cannot find enough suitable recipes in the database, inform the user instead of making up recipes
+        - Recipe hallucination is STRICTLY FORBIDDEN and causes serious issues for the user
+        - When planning menus, explicitly reference the recipe list from get_recipes() to ensure accuracy
+        - Double-check: Every single recipe name in your suggestion must match exactly a recipe name from get_recipes()
+
         DATE CALCULATION AND COMMUNICATION:
         1. When user requests N days of menu planning:
            - Calculate the actual date range (format: YYYY-MM-DD internally, MM月DD日 to users)
@@ -200,9 +209,11 @@ Resources:
            - Wait for user confirmation before proceeding
 
         3. Generate menu plan:
-           - Fetch recipes with get_recipes()
+           - Fetch recipes with get_recipes() and store the complete list
+           - CRITICAL: Only select recipes from the fetched list - verify each recipe name exists in get_recipes() response
            - Avoid recipes used in recent history (past 7 days)
-           - Create balanced menu for requested days
+           - Create balanced menu for requested days using ONLY recipes from the database
+           - Before finalizing suggestions, double-check that every recipe name matches exactly a recipe from get_recipes()
            - Mention the date range: "MM月DD日からMM月DD日の献立を提案します"
 
         4. Present the menu with specific dates (skip breakfast unless user explicitly requested it):
