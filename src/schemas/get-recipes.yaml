@@ -45,18 +45,12 @@ paths:
                     items:
                       type: object
                       properties:
-                        recipe_id:
-                          type: string
-                          description: Unique identifier for the recipe
                         name:
                           type: string
-                          description: Recipe name
+                          description: Recipe name (unique identifier)
                         category:
                           type: string
                           description: Recipe category (主菜, 副菜, etc.)
-                        cooking_time:
-                          type: integer
-                          description: Cooking time in minutes
                         ingredients:
                           type: array
                           description: List of ingredients
@@ -65,11 +59,6 @@ paths:
                         recipe_url:
                           type: string
                           description: URL to the full recipe (optional)
-                        tags:
-                          type: array
-                          description: Tags for the recipe
-                          items:
-                            type: string
                   error:
                     type: string
                     description: Error message if something went wrong

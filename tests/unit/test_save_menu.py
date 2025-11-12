@@ -24,21 +24,9 @@ class TestSaveMenuAction:
                             "type": "object",
                             "value": json.dumps(
                                 {
-                                    "breakfast": [
-                                        {"recipe_id": "recipe_001", "name": "味噌汁"}
-                                    ],
-                                    "lunch": [
-                                        {
-                                            "recipe_id": "recipe_004",
-                                            "name": "カレーライス",
-                                        }
-                                    ],
-                                    "dinner": [
-                                        {
-                                            "recipe_id": "recipe_002",
-                                            "name": "鮭の塩焼き",
-                                        }
-                                    ],
+                                    "breakfast": ["味噌汁"],
+                                    "lunch": ["カレーライス"],
+                                    "dinner": ["鮭の塩焼き"],
                                 }
                             ),
                         },
@@ -71,13 +59,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": [
-                                        {"recipe_id": "recipe_001", "name": "味噌汁"}
-                                    ]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["味噌汁"]}),
                         },
                         {
                             "name": "notes",
@@ -106,13 +88,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": [
-                                        {"recipe_id": "recipe_001", "name": "味噌汁"}
-                                    ]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["味噌汁"]}),
                         },
                     ]
                 }
@@ -142,13 +118,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": json.dumps(
-                                {
-                                    "breakfast": [
-                                        {"recipe_id": "recipe_001", "name": "味噌汁"}
-                                    ]
-                                }
-                            ),
+                            "value": json.dumps({"breakfast": ["味噌汁"]}),
                         },
                         {"name": "overwrite", "type": "boolean", "value": "true"},
                     ]
@@ -242,11 +212,11 @@ class TestSaveMenuAction:
         assert body["success"] is False
         assert "meals is required" in body["error"]
 
-    def test_save_menu_bedrock_python_dict_format(
+    def test_save_menu_bedrock_json_format(
         self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
-        """Test parsing meals parameter in Bedrock Python dict format."""
-        # Simulate Bedrock Agent sending Python dict format instead of JSON
+        """Test parsing meals parameter in JSON format (standard Bedrock behavior)."""
+        # Simulate Bedrock Agent sending JSON format
         event = bedrock_agent_event.copy()
         event["requestBody"] = {
             "content": {
@@ -256,7 +226,7 @@ class TestSaveMenuAction:
                         {
                             "name": "meals",
                             "type": "object",
-                            "value": "{breakfast=[{recipe_id=recipe_001, name=味噌汁}], lunch=[{recipe_id=recipe_004, name=カレー}]}",
+                            "value": '{"breakfast": ["味噌汁"], "lunch": ["カレー"]}',
                         },
                     ]
                 }
@@ -271,10 +241,10 @@ class TestSaveMenuAction:
         body = json.loads(body_str)
         assert body["success"] is True
 
-    def test_save_menu_recipe_id_extraction(
+    def test_save_menu_recipe_name_extraction(
         self, mock_dynamodb_tables, bedrock_agent_event, save_menu_handler
     ):
-        """Test that recipe_ids are extracted into flat list."""
+        """Test that recipe names are extracted into flat list."""
         import boto3
 
         event = bedrock_agent_event.copy()
@@ -288,16 +258,9 @@ class TestSaveMenuAction:
                             "type": "object",
                             "value": json.dumps(
                                 {
-                                    "breakfast": [
-                                        {"recipe_id": "recipe_001", "name": "味噌汁"}
-                                    ],
-                                    "lunch": [
-                                        {"recipe_id": "recipe_002", "name": "鮭"}
-                                    ],
-                                    "dinner": [
-                                        {"recipe_id": "recipe_003", "name": "おひたし"},
-                                        {"recipe_id": "recipe_004", "name": "カレー"},
-                                    ],
+                                    "breakfast": ["味噌汁", "納豆"],
+                                    "lunch": ["焼き鮭", "サラダ"],
+                                    "dinner": ["おひたし", "カレー"],
                                 }
                             ),
                         },
@@ -309,13 +272,17 @@ class TestSaveMenuAction:
         response = save_menu_handler(event, None)
         assert response["response"]["httpStatusCode"] == 200
 
-        # Verify the saved item has recipe_ids in flat list
+        # Verify the saved item has recipe names in flat list
         dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
         table = dynamodb.Table("test-history-table")
         saved_item = table.get_item(Key={"date": "2025-11-13"})["Item"]
-        assert len(saved_item["recipes"]) == 4
-        assert "recipe_001" in saved_item["recipes"]
-        assert "recipe_004" in saved_item["recipes"]
+        assert len(saved_item["recipes"]) == 6
+        assert "味噌汁" in saved_item["recipes"]
+        assert "納豆" in saved_item["recipes"]
+        assert "焼き鮭" in saved_item["recipes"]
+        assert "サラダ" in saved_item["recipes"]
+        assert "おひたし" in saved_item["recipes"]
+        assert "カレー" in saved_item["recipes"]
 
     def test_save_menu_error_handling(
         self, mock_env_vars, bedrock_agent_event, save_menu_handler

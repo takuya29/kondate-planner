@@ -78,15 +78,28 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
 
         logger.info(f"Getting menu history for past {days} days")
 
-        table = get_dynamodb().Table(HISTORY_TABLE)
+        dynamodb = get_dynamodb()
+
+        # Generate all date keys to fetch
+        date_keys = [
+            {"date": (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")}
+            for i in range(days)
+        ]
+
         history_list = []
 
-        # Fetch history for the specified number of days
-        for i in range(days):
-            date = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
-            response = table.get_item(Key={"date": date})
-            if "Item" in response:
-                history_list.append(decimal_to_float(response["Item"]))
+        # DynamoDB batch_get_item has a limit of 100 items per request
+        # Process in chunks of 100
+        for i in range(0, len(date_keys), 100):
+            chunk = date_keys[i : i + 100]
+            response = dynamodb.batch_get_item(
+                RequestItems={HISTORY_TABLE: {"Keys": chunk}}
+            )
+
+            # Extract items from the response
+            if HISTORY_TABLE in response.get("Responses", {}):
+                for item in response["Responses"][HISTORY_TABLE]:
+                    history_list.append(decimal_to_float(item))
 
         # Sort by date (most recent first)
         history_list.sort(key=lambda x: x["date"], reverse=True)

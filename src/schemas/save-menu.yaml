@@ -45,34 +45,20 @@ paths:
                       type: array
                       description: Breakfast recipes (1-2 items)
                       items:
-                        type: object
-                        properties:
-                          recipe_id:
-                            type: string
-                            description: Recipe ID from the recipes database
-                          name:
-                            type: string
-                            description: Recipe name
+                        type: string
+                        description: Recipe name
                     lunch:
                       type: array
                       description: Lunch recipes (1-3 items)
                       items:
-                        type: object
-                        properties:
-                          recipe_id:
-                            type: string
-                          name:
-                            type: string
+                        type: string
+                        description: Recipe name
                     dinner:
                       type: array
                       description: Dinner recipes (2-3 items)
                       items:
-                        type: object
-                        properties:
-                          recipe_id:
-                            type: string
-                          name:
-                            type: string
+                        type: string
+                        description: Recipe name
                 notes:
                   type: string
                   description: Optional notes about this menu

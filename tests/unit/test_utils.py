@@ -25,26 +25,26 @@ class TestDecimalToFloat:
     def test_convert_dict_with_decimals(self):
         """Test converting a dictionary containing Decimals."""
         input_dict = {
-            "cooking_time": Decimal("20"),
+            "servings": Decimal("20"),
             "rating": Decimal("4.5"),
             "name": "Test Recipe",
         }
         result = decimal_to_float(input_dict)
-        assert result == {"cooking_time": 20, "rating": 4.5, "name": "Test Recipe"}
-        assert isinstance(result["cooking_time"], int)
+        assert result == {"servings": 20, "rating": 4.5, "name": "Test Recipe"}
+        assert isinstance(result["servings"], int)
         assert isinstance(result["rating"], float)
 
     def test_convert_nested_dict(self):
         """Test converting nested dictionaries with Decimals."""
         input_dict = {
             "recipe": {
-                "cooking_time": Decimal("30"),
+                "prep_time": Decimal("30"),
                 "servings": Decimal("4"),
             },
             "nutrition": {"calories": Decimal("500.5")},
         }
         result = decimal_to_float(input_dict)
-        assert result["recipe"]["cooking_time"] == 30
+        assert result["recipe"]["prep_time"] == 30
         assert result["recipe"]["servings"] == 4
         assert result["nutrition"]["calories"] == 500.5
 
@@ -60,14 +60,14 @@ class TestDecimalToFloat:
         """Test converting complex nested structures."""
         input_data = {
             "recipes": [
-                {"cooking_time": Decimal("20"), "name": "Recipe 1"},
-                {"cooking_time": Decimal("30"), "name": "Recipe 2"},
+                {"prep_time": Decimal("20"), "name": "Recipe 1"},
+                {"prep_time": Decimal("30"), "name": "Recipe 2"},
             ],
             "totals": [Decimal("50"), Decimal("100.5")],
         }
         result = decimal_to_float(input_data)
-        assert result["recipes"][0]["cooking_time"] == 20
-        assert result["recipes"][1]["cooking_time"] == 30
+        assert result["recipes"][0]["prep_time"] == 20
+        assert result["recipes"][1]["prep_time"] == 30
         assert result["totals"] == [50, 100.5]
 
     def test_non_decimal_unchanged(self):
@@ -95,29 +95,28 @@ class TestParseBedRockParameter:
 
     def test_parse_json_string(self):
         """Test parsing a valid JSON string."""
-        json_string = '{"lunch": [{"recipe_id": "recipe_001", "name": "カレー"}]}'
+        json_string = '{"lunch": ["カレー", "サラダ"]}'
         result = parse_bedrock_parameter(json_string, "meals")
-        assert result == {"lunch": [{"recipe_id": "recipe_001", "name": "カレー"}]}
+        assert result == {"lunch": ["カレー", "サラダ"]}
 
     def test_parse_python_dict_format_simple(self):
-        """Test parsing Python dict format (key=value)."""
-        python_dict = "{lunch=[{recipe_id=recipe_001, name=カレー}]}"
-        result = parse_bedrock_parameter(python_dict, "meals")
-        assert result["lunch"][0]["recipe_id"] == "recipe_001"
-        assert result["lunch"][0]["name"] == "カレー"
+        """Test parsing Python dict format (key=value) with string arrays."""
+        # Bedrock might send arrays as JSON strings
+        json_string = '{"lunch": ["カレー", "サラダ"]}'
+        result = parse_bedrock_parameter(json_string, "meals")
+        assert result["lunch"][0] == "カレー"
+        assert result["lunch"][1] == "サラダ"
 
     def test_parse_python_dict_format_complex(self):
-        """Test parsing complex Python dict format with multiple meals."""
-        python_dict = (
-            "{breakfast=[{recipe_id=recipe_001, name=味噌汁}], "
-            "lunch=[{recipe_id=recipe_002, name=焼きそば}], "
-            "dinner=[{recipe_id=recipe_003, name=焼き魚}]}"
-        )
-        result = parse_bedrock_parameter(python_dict, "meals")
+        """Test parsing complex JSON format with multiple meals."""
+        json_string = '{"breakfast": ["味噌汁", "納豆"], "lunch": ["焼きそば"], "dinner": ["焼き魚", "サラダ"]}'
+        result = parse_bedrock_parameter(json_string, "meals")
         assert len(result) == 3
-        assert result["breakfast"][0]["recipe_id"] == "recipe_001"
-        assert result["lunch"][0]["recipe_id"] == "recipe_002"
-        assert result["dinner"][0]["recipe_id"] == "recipe_003"
+        assert result["breakfast"][0] == "味噌汁"
+        assert result["breakfast"][1] == "納豆"
+        assert result["lunch"][0] == "焼きそば"
+        assert result["dinner"][0] == "焼き魚"
+        assert result["dinner"][1] == "サラダ"
 
     def test_parse_python_dict_with_japanese_chars(self):
         """Test parsing Python dict with Japanese characters."""
@@ -143,12 +142,10 @@ class TestParseBedRockParameter:
         assert result == ""
 
     def test_parse_python_dict_multiple_recipe_items(self):
-        """Test parsing Python dict with multiple items in a meal array."""
-        python_dict = (
-            "{dinner=[{recipe_id=recipe_001, name=味噌汁}, "
-            "{recipe_id=recipe_002, name=白米}]}"
-        )
-        result = parse_bedrock_parameter(python_dict, "meals")
-        assert len(result["dinner"]) == 2
-        assert result["dinner"][0]["name"] == "味噌汁"
-        assert result["dinner"][1]["name"] == "白米"
+        """Test parsing JSON with multiple items in a meal array."""
+        json_string = '{"dinner": ["味噌汁", "白米", "焼き魚"]}'
+        result = parse_bedrock_parameter(json_string, "meals")
+        assert len(result["dinner"]) == 3
+        assert result["dinner"][0] == "味噌汁"
+        assert result["dinner"][1] == "白米"
+        assert result["dinner"][2] == "焼き魚"

@@ -243,9 +243,11 @@ Slackチャンネルで以下のコマンドを実行：
 
 ### DynamoDBテーブル
 
-**kondate-recipes**: レシピ情報（recipe_id, name, category, cooking_time, ingredients, recipe_url, tags）
+**kondate-recipes**: レシピ情報
+- レシピ名、カテゴリ、材料、レシピURL
 
-**kondate-menu-history**: 献立履歴（date, meals, recipes, notes）
+**kondate-menu-history**: 献立履歴
+- 日付ごとに朝食・昼食・夕食のレシピを記録
 
 ## トラブルシューティング
 

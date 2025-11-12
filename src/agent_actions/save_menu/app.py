@@ -131,17 +131,18 @@ def lambda_handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
         history = {
             "date": date,
             "meals": meals,
-            "recipes": [],  # Flat list of recipe IDs
+            "recipes": [],  # Flat list of recipe names
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
         }
 
-        # Extract recipe IDs from meals structure
+        # Extract recipe names from meals structure
+        # meals is now a simple structure: {breakfast: ["recipe1", "recipe2"], lunch: [...], dinner: [...]}
         for meal_type in ["breakfast", "lunch", "dinner"]:
             if meal_type in meals:
-                for recipe in meals[meal_type]:
-                    if recipe.get("recipe_id"):
-                        history["recipes"].append(recipe["recipe_id"])
+                # meals[meal_type] is now an array of strings (recipe names)
+                if isinstance(meals[meal_type], list):
+                    history["recipes"].extend(meals[meal_type])
 
         # Add optional notes
         if notes:

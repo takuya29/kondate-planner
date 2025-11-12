@@ -155,7 +155,7 @@ Current coverage by module:
 - Handle Bedrock Agent parameter formats (JSON and Python dict)
 - Reject duplicate saves without overwrite flag
 - Overwrite existing menu with overwrite flag
-- Extract recipe_ids into flat list
+- Extract recipe names into flat list
 - Handle missing required fields
 
 ### utils.py Tests
