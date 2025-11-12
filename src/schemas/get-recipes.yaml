@@ -45,12 +45,9 @@ paths:
                     items:
                       type: object
                       properties:
-                        recipe_id:
-                          type: string
-                          description: Unique identifier for the recipe
                         name:
                           type: string
-                          description: Recipe name
+                          description: Recipe name (unique identifier)
                         category:
                           type: string
                           description: Recipe category (主菜, 副菜, etc.)

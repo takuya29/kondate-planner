@@ -97,9 +97,9 @@ class TestGetRecipesAction:
             dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
             dynamodb.create_table(
                 TableName=mock_env_vars["RECIPES_TABLE"],
-                KeySchema=[{"AttributeName": "recipe_id", "KeyType": "HASH"}],
+                KeySchema=[{"AttributeName": "name", "KeyType": "HASH"}],
                 AttributeDefinitions=[
-                    {"AttributeName": "recipe_id", "AttributeType": "S"}
+                    {"AttributeName": "name", "AttributeType": "S"}
                 ],
                 BillingMode="PAY_PER_REQUEST",
             )

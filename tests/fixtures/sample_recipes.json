@@ -1,6 +1,5 @@
 [
   {
-    "recipe_id": "recipe_001",
     "name": "味噌汁",
     "category": "汁物",
     "ingredients": ["味噌", "だし", "豆腐", "わかめ"],
@@ -9,7 +8,6 @@
     "updated_at": "2025-01-01T00:00:00"
   },
   {
-    "recipe_id": "recipe_002",
     "name": "鮭の塩焼き",
     "category": "主菜",
     "ingredients": ["鮭", "塩", "レモン"],
@@ -18,7 +16,6 @@
     "updated_at": "2025-01-01T00:00:00"
   },
   {
-    "recipe_id": "recipe_003",
     "name": "ほうれん草のおひたし",
     "category": "副菜",
     "ingredients": ["ほうれん草", "醤油", "かつお節"],
@@ -27,7 +24,6 @@
     "updated_at": "2025-01-01T00:00:00"
   },
   {
-    "recipe_id": "recipe_004",
     "name": "カレーライス",
     "category": "主菜",
     "ingredients": ["カレールー", "じゃがいも", "にんじん", "玉ねぎ", "豚肉"],
@@ -36,7 +32,6 @@
     "updated_at": "2025-01-01T00:00:00"
   },
   {
-    "recipe_id": "recipe_005",
     "name": "白米",
     "category": "主食",
     "ingredients": ["米", "水"],

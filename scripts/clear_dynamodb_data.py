@@ -125,12 +125,12 @@ def main():
     tables_to_clear = []
     if args.all:
         tables_to_clear = [
-            (RECIPES_TABLE, "recipe_id"),
+            (RECIPES_TABLE, "name"),
             (HISTORY_TABLE, "date"),
         ]
     else:
         if args.recipes:
-            tables_to_clear.append((RECIPES_TABLE, "recipe_id"))
+            tables_to_clear.append((RECIPES_TABLE, "name"))
         if args.history:
             tables_to_clear.append((HISTORY_TABLE, "date"))
 

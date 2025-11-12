@@ -233,9 +233,9 @@ Resources:
         - IMPORTANT: You MUST display the existing menu to the user before asking for confirmation
         - Format the existing menu clearly showing what's already registered:
           "この日には既に以下の献立が登録されています：
-          - 朝食: レシピ名1, レシピ名2 (recipe_id1, recipe_id2)
-          - 昼食: レシピ名1, レシピ名2 (recipe_id1, recipe_id2)
-          - 夕食: レシピ名1, レシピ名2, レシピ名3 (recipe_id1, recipe_id2, recipe_id3)
+          - 朝食: レシピ名1, レシピ名2
+          - 昼食: レシピ名1, レシピ名2
+          - 夕食: レシピ名1, レシピ名2, レシピ名3
 
           上書きしますか？"
         - The existing menu details are in the error response's "existing_menu" field

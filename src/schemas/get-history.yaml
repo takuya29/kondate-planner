@@ -17,7 +17,7 @@ paths:
         - Need to ensure variety in meal planning
 
         Returns a list of past menus with detailed meal structure and a flat
-        list of recipe IDs for easy deduplication checking.
+        list of recipe names for easy deduplication checking.
       requestBody:
         required: false
         content:
@@ -60,33 +60,21 @@ paths:
                             breakfast:
                               type: array
                               items:
-                                type: object
-                                properties:
-                                  recipe_id:
-                                    type: string
-                                  name:
-                                    type: string
+                                type: string
+                                description: Recipe name
                             lunch:
                               type: array
                               items:
-                                type: object
-                                properties:
-                                  recipe_id:
-                                    type: string
-                                  name:
-                                    type: string
+                                type: string
+                                description: Recipe name
                             dinner:
                               type: array
                               items:
-                                type: object
-                                properties:
-                                  recipe_id:
-                                    type: string
-                                  name:
-                                    type: string
+                                type: string
+                                description: Recipe name
                         recipes:
                           type: array
-                          description: Flat list of all recipe IDs used on this date (for deduplication)
+                          description: Flat list of all recipe names used on this date (for deduplication)
                           items:
                             type: string
                         notes:

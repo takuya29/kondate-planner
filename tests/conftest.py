@@ -96,8 +96,8 @@ def mock_dynamodb_tables(mock_env_vars, sample_recipes, sample_history):
         # Create recipes table
         recipes_table = dynamodb.create_table(
             TableName=mock_env_vars["RECIPES_TABLE"],
-            KeySchema=[{"AttributeName": "recipe_id", "KeyType": "HASH"}],
-            AttributeDefinitions=[{"AttributeName": "recipe_id", "AttributeType": "S"}],
+            KeySchema=[{"AttributeName": "name", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "name", "AttributeType": "S"}],
             BillingMode="PAY_PER_REQUEST",
         )
 

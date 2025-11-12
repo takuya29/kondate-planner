@@ -61,9 +61,14 @@ def parse_bedrock_parameter(value: Any, field_name: str = "parameter") -> Any:
     """
     Convert Bedrock Agent parameter format to proper Python object.
 
-    Bedrock Agent sometimes sends parameters in Python dict-like format instead of JSON:
-    Input: {lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
-    Output: {"lunch":[{"recipe_id":"recipe_019","name":"焼きそば"}],"breakfast":[...]}
+    Bedrock Agent sometimes sends parameters in Python dict-like format instead of JSON.
+
+    Examples:
+    - Simple JSON: {"lunch": ["焼きそば", "サラダ"]}
+    - Python dict format: {lunch=[焼きそば, サラダ], breakfast=[...]}
+
+    With the simplified schema, meal arrays now contain recipe names as strings instead
+    of objects.
 
     Args:
         value: The parameter value (can be string, dict, or other type)
@@ -94,8 +99,7 @@ def parse_bedrock_parameter(value: Any, field_name: str = "parameter") -> Any:
         pass
 
     # Convert Python-like dict format to JSON
-    # Input: {lunch=[{recipe_id=recipe_019, name=焼きそば}], breakfast=[...]}
-    # Output: {"lunch":[{"recipe_id":"recipe_019","name":"焼きそば"}],"breakfast":[...]}
+    # Example: {lunch=[焼きそば, サラダ]} -> {"lunch":["焼きそば","サラダ"]}
 
     try:
         converted = value
@@ -109,7 +113,7 @@ def parse_bedrock_parameter(value: Any, field_name: str = "parameter") -> Any:
 
         # Step 3: Add quotes around unquoted string values
         # Matches values that are not already quoted and not numbers/booleans
-        # Pattern: ": recipe_019" -> ": "recipe_019""
+        # Pattern: ": value" -> ": "value""
         converted = re.sub(r":\s*([a-zA-Z][a-zA-Z0-9_]*)", r': "\1"', converted)
 
         # Step 4: Add quotes around Japanese/special character values

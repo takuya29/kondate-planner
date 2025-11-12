@@ -43,22 +43,8 @@ class TestDynamoDBIntegration:
                             "type": "object",
                             "value": json.dumps(
                                 {
-                                    "breakfast": [
-                                        {
-                                            "recipe_id": recipes_body["recipes"][0][
-                                                "recipe_id"
-                                            ],
-                                            "name": recipes_body["recipes"][0]["name"],
-                                        }
-                                    ],
-                                    "lunch": [
-                                        {
-                                            "recipe_id": recipes_body["recipes"][1][
-                                                "recipe_id"
-                                            ],
-                                            "name": recipes_body["recipes"][1]["name"],
-                                        }
-                                    ],
+                                    "breakfast": [recipes_body["recipes"][0]["name"]],
+                                    "lunch": [recipes_body["recipes"][1]["name"]],
                                 }
                             ),
                         },
@@ -126,12 +112,7 @@ class TestDynamoDBIntegration:
                             "type": "object",
                             "value": json.dumps(
                                 {
-                                    "dinner": [
-                                        {
-                                            "recipe_id": main_dishes[0]["recipe_id"],
-                                            "name": main_dishes[0]["name"],
-                                        }
-                                    ]
+                                    "dinner": [main_dishes[0]["name"]]
                                 }
                             ),
                         },
@@ -178,9 +159,7 @@ class TestDynamoDBIntegration:
                             "type": "object",
                             "value": json.dumps(
                                 {
-                                    "breakfast": [
-                                        {"recipe_id": "new_001", "name": "新しい"}
-                                    ]
+                                    "breakfast": ["新しい"]
                                 }
                             ),
                         },
@@ -225,9 +204,7 @@ class TestDynamoDBIntegration:
                             "value": json.dumps(
                                 {
                                     "breakfast": [],
-                                    "lunch": [
-                                        {"recipe_id": "recipe_001", "name": "味噌汁"}
-                                    ],
+                                    "lunch": ["味噌汁"],
                                     "dinner": [],
                                 }
                             ),
@@ -253,4 +230,4 @@ class TestDynamoDBIntegration:
         today = datetime.now().strftime("%Y-%m-%d")
         menu = next((h for h in history_body["history"] if h["date"] == today), None)
         assert menu is not None
-        assert menu["meals"]["lunch"][0]["recipe_id"] == "recipe_001"
+        assert menu["meals"]["lunch"][0] == "味噌汁"
