@@ -133,12 +133,19 @@ Resources:
         EVERY recipe name you suggest MUST come from the get_recipes() action response.
         If a recipe name is not in the get_recipes() response, you CANNOT use it.
 
+        STRICT MATCHING REQUIREMENTS:
+        - Use the EXACT recipe name from get_recipes() - character-for-character match
+        - Do NOT abbreviate, modify, or paraphrase recipe names
+        - Do NOT use similar recipe names (e.g., if database has "鶏の照り焼き", don't use "照り焼きチキン")
+        - Do NOT use generic recipe names based on your knowledge (e.g., "カレー", "味噌汁")
+        - Even if a recipe name seems common or obvious, you MUST verify it exists in get_recipes()
+
         Before suggesting ANY menu:
         1. Call get_recipes() first
-        2. Store the EXACT recipe names from the response
-        3. ONLY select from those exact names
+        2. Store the EXACT recipe names from the response (character-for-character)
+        3. ONLY select from those exact names - no variations allowed
         4. Before presenting your menu to the user, verify EACH recipe name one-by-one against your stored list
-        5. If you cannot verify a recipe exists, REMOVE it from your suggestion
+        5. If you cannot verify a recipe exists with exact character match, REMOVE it from your suggestion
 
         Inventing recipes is a CRITICAL ERROR that breaks the application.
         When in doubt, use fewer recipes rather than inventing new ones.
@@ -220,27 +227,36 @@ Resources:
         3. Generate menu plan:
            - Fetch recipes with get_recipes() and store the complete list
            - CRITICAL VERIFICATION PROCESS (YOU MUST DO THIS):
-             a. Write down all recipe names from get_recipes() response
-             b. For each day, select recipes ONLY from that list
-             c. Before presenting to user, verify EACH recipe name:
+             a. FIRST: Internally enumerate ALL recipe names from get_recipes() response
+                Example: "Available recipes: [Recipe A, Recipe B, Recipe C, ...]"
+             b. SECOND: For each day, select recipes ONLY from that enumerated list
+             c. THIRD: Before presenting to user, do a final verification:
                 - Go through your suggested menu line by line
-                - Check if each recipe name exists in the get_recipes() list
+                - Check if each recipe name exists EXACTLY in the get_recipes() list
                 - If a recipe name is NOT in the list, REMOVE it immediately
-                - It is better to suggest fewer recipes than to invent recipes
+                - If uncertain about a recipe name, DO NOT USE IT
+                - It is better to suggest fewer recipes than to risk inventing recipes
            - Avoid recipes used in recent history (past 7 days)
            - Create balanced menu for requested days using ONLY verified recipes
            - Mention the date range: "MM月DD日からMM月DD日の献立を提案します"
 
-        4. Present the menu with specific dates (skip breakfast unless user explicitly requested it):
+        4. FINAL SANITY CHECK (before presenting to user):
+           - Review your menu one last time
+           - Confirm EVERY recipe name is from get_recipes() response
+           - If you have ANY doubt about a recipe name, remove it
+           - Ask yourself: "Did I get this recipe name from get_recipes()?"
+           - If the answer is "maybe" or "I think so", DO NOT use that recipe
+
+        5. Present the menu with specific dates (skip breakfast unless user explicitly requested it):
            **MM月DD日 (Day of week):**
            - 昼食: レシピ名1, レシピ名2
            - 夕食: レシピ名1, レシピ名2, レシピ名3
 
            (Only include breakfast line if user explicitly asked for breakfast suggestions)
 
-        5. Ask: "この献立で保存しますか？"
+        6. Ask: "この献立で保存しますか？"
 
-        6. On confirmation:
+        7. On confirmation:
            - When saving multiple days (e.g., 3-day menu):
              * Call save_menu() once for EACH date (3 separate calls)
              * Save sequentially, not in parallel
@@ -318,7 +334,17 @@ Resources:
 
         CRITICAL: Replace [verified recipe from database] with ONLY recipe names that exist in your get_recipes() response.
 
-        Example 2 - Conflict Detected:
+        Example 2 - WRONG WAY (DO NOT DO THIS):
+        User: "3日分の献立をお願いします"
+        Agent: ❌ WRONG - Suggests recipes WITHOUT calling get_recipes() first
+        Agent: ❌ WRONG - Invents recipe names that may not exist in database
+        Agent: ❌ WRONG - Suggests recipes based on general knowledge instead of database
+
+        WHY THIS IS WRONG: The user cannot cook these recipes because they don't exist in the recipe database. This breaks the application.
+
+        CORRECT APPROACH: ALWAYS call get_recipes() first, then ONLY suggest recipes from the response.
+
+        Example 3 - Conflict Detected:
         User: "明日の献立を提案して"
         Agent:
         1. Call get_history(days=30)
@@ -336,7 +362,7 @@ Resources:
         - Provide brief cooking tips or nutritional insights when relevant
       ActionGroups:
         - ActionGroupName: GetRecipes
-          Description: Retrieve recipes from database
+          Description: Retrieve recipes from database - MUST call before suggesting any menu
           ActionGroupExecutor:
             Lambda: !GetAtt GetRecipesActionFunction.Arn
           ApiSchema:
@@ -345,12 +371,12 @@ Resources:
               info:
                 title: Get Recipes API
                 version: 1.0.0
-                description: Retrieve recipes from DynamoDB, optionally filtered by category
+                description: Retrieve recipes from DynamoDB. CRITICAL - You must ONLY suggest recipes returned by this API. Never invent recipe names.
               paths:
                 /get-recipes:
                   post:
                     summary: Get recipes
-                    description: Retrieve all recipes or filter by category (主菜, 副菜, 汁物, etc.)
+                    description: Retrieve all available recipes. MUST be called before suggesting menus. Only recipes returned by this endpoint can be suggested to users. Filter by category (主菜, 副菜, 汁物, etc.) if needed.
                     operationId: getRecipes
                     requestBody:
                       required: false
@@ -453,7 +479,7 @@ Resources:
                                       notes:
                                         type: string
         - ActionGroupName: SaveMenu
-          Description: Save approved menus
+          Description: Save approved menus with verified recipes only
           ActionGroupExecutor:
             Lambda: !GetAtt SaveMenuActionFunction.Arn
           ApiSchema:
@@ -462,12 +488,12 @@ Resources:
               info:
                 title: Save Menu API
                 version: 1.0.0
-                description: Save a confirmed menu plan to history
+                description: Save a confirmed menu plan to history. Only save recipes that were returned by get_recipes() API.
               paths:
                 /save-menu:
                   post:
                     summary: Save menu
-                    description: Save a menu plan to history. ONLY call this after user explicitly confirms (yes/はい/保存して/looks good).
+                    description: Save a menu plan to history. ONLY call this after user explicitly confirms (yes/はい/保存して/looks good). Ensure all recipe names in the menu were returned by get_recipes() before saving.
                     operationId: saveMenu
                     requestBody:
                       required: true
