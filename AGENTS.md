@@ -571,6 +571,224 @@ When deploying to a new environment:
 
 **That's it!** The Bedrock Agent, action groups, IAM roles, and Slack integration are all managed by CloudFormation now.
 
+## CI/CD with GitHub Actions
+
+The project supports automated deployment via GitHub Actions, triggered on pushes to the main branch or manual workflow dispatch.
+
+### Workflow Configuration
+
+**Location**: `.github/workflows/deploy.yml`
+
+**Triggers**:
+- Push to `main` branch
+- Manual workflow dispatch (via GitHub Actions UI)
+
+**Steps**:
+1. Checkout code
+2. Set up Python 3.12
+3. Install SAM CLI
+4. Configure AWS credentials (OIDC recommended)
+5. Run `sam build`
+6. Run `sam deploy` with Slack parameters
+
+### AWS Authentication Setup
+
+#### Option 1: OIDC (Recommended)
+
+OIDC provides better security than long-lived access keys:
+
+**1. Create IAM OIDC Identity Provider**:
+```bash
+# Via AWS Console: IAM → Identity providers → Add provider
+# Provider type: OpenID Connect
+# Provider URL: https://token.actions.githubusercontent.com
+# Audience: sts.amazonaws.com
+```
+
+**2. Create IAM Role with Trust Policy**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:OWNER/kondate-planner:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+**3. Attach Required Permissions**:
+- CloudFormation (create/update stacks)
+- S3 (upload SAM artifacts)
+- Lambda (create/update functions)
+- IAM (create/update roles)
+- DynamoDB (create/update tables)
+- Bedrock (create/update agents)
+- Chatbot (create/update Slack configurations)
+
+**Recommended Managed Policies**:
+- `AWSCloudFormationFullAccess`
+- `AWSLambda_FullAccess`
+- `IAMFullAccess` (or custom minimal policy)
+- `AmazonDynamoDBFullAccess`
+
+**Custom Policies for Bedrock and Chatbot**:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:*",
+        "chatbot:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+#### Option 2: Access Keys (Not Recommended)
+
+Use IAM user with access keys only if OIDC is not feasible. Store `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` as GitHub Secrets.
+
+### GitHub Secrets Configuration
+
+**Required Secrets** (Settings → Secrets and variables → Actions):
+
+| Secret Name | Description | Example |
+|-------------|-------------|---------|
+| `AWS_ROLE_ARN` | IAM Role ARN for OIDC authentication | `arn:aws:iam::123456789012:role/GitHubActionsRole` |
+| `SLACK_WORKSPACE_ID` | Slack Workspace ID from Amazon Q Developer Console | `T1234567890` |
+| `SLACK_CHANNEL_ID` | Slack Channel ID | `C1234567890` |
+
+**Optional Secrets** (if using access keys instead of OIDC):
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION` (or hardcode `ap-northeast-1` in workflow)
+
+### Workflow File Structure
+
+```yaml
+name: Deploy SAM Application to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      - name: SAM Build
+        run: sam build
+
+      - name: SAM Deploy
+        run: |
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              SlackWorkspaceId=${{ secrets.SLACK_WORKSPACE_ID }} \
+              SlackChannelId=${{ secrets.SLACK_CHANNEL_ID }}
+```
+
+### Manual Workflow Execution
+
+To manually trigger deployment:
+1. Go to **Actions** tab in GitHub
+2. Select **Deploy SAM Application to AWS**
+3. Click **Run workflow**
+4. Select branch (usually `main`)
+5. Click **Run workflow** button
+
+### Deployment Verification
+
+After workflow completes, verify deployment:
+
+```bash
+# Check stack outputs
+aws cloudformation describe-stacks --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs' --output table
+
+# Check Bedrock Agent status
+aws bedrock-agent get-agent --agent-id <AGENT_ID>
+```
+
+### Troubleshooting CI/CD
+
+**Common Issues**:
+
+1. **OIDC Authentication Failed**:
+   - Verify IAM OIDC provider is configured correctly
+   - Check trust policy repository name matches exactly
+   - Ensure workflow has `id-token: write` permission
+
+2. **SAM Deploy Fails with Permission Error**:
+   - Verify IAM role has all required permissions
+   - Check CloudFormation stack events for specific errors
+   - Ensure S3 bucket for SAM artifacts exists
+
+3. **Slack Parameters Missing**:
+   - Verify `SLACK_WORKSPACE_ID` and `SLACK_CHANNEL_ID` secrets are set
+   - Check workflow logs to see parameter values (masked)
+
+4. **Changeset Contains No Changes**:
+   - Normal behavior when no code/template changes
+   - Workflow uses `--no-fail-on-empty-changeset` to handle this
+
+### Security Best Practices
+
+- **Never commit secrets to repository**: Use GitHub Secrets for all sensitive values
+- **Use OIDC over access keys**: Automatic credential rotation, better audit trail
+- **Restrict workflow permissions**: Use minimal `permissions:` block
+- **Review CloudFormation changesets**: Monitor what resources are being modified
+- **Rotate access keys regularly**: If using access keys instead of OIDC
+
+### Future CI/CD Enhancements
+
+- Add testing stage before deployment (run unit tests, integration tests)
+- Multi-environment deployment (staging, production)
+- Manual approval gate for production deployments
+- Post-deployment verification (health checks, smoke tests)
+- Rollback mechanism on deployment failure
+- Slack notifications on deployment success/failure
+
 ## Future Enhancements
 
 - Replace DynamoDB recipe data source with Notion API integration
