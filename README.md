@@ -251,6 +251,81 @@ Slackチャンネルで以下のコマンドを実行：
 **kondate-menu-history**: 献立履歴
 - 日付ごとに朝食・昼食・夕食のレシピを記録
 
+## CI/CD自動デプロイ
+
+GitHub Actionsを使ってmainブランチへのpush時に自動デプロイが可能です。
+
+### 前提条件
+
+#### 1. AWS OIDC設定（推奨）
+
+長期的なアクセスキーを使わず、OIDCを使った認証が推奨されます：
+
+1. **AWS IAM Identity Providerを作成**:
+   - IAM Console → Identity providers → Add provider
+   - Provider type: OpenID Connect
+   - Provider URL: `https://token.actions.githubusercontent.com`
+   - Audience: `sts.amazonaws.com`
+
+2. **IAM Roleを作成**:
+   - Trust policy example:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": {
+           "Federated": "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
+         },
+         "Action": "sts:AssumeRoleWithWebIdentity",
+         "Condition": {
+           "StringEquals": {
+             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+           },
+           "StringLike": {
+             "token.actions.githubusercontent.com:sub": "repo:YOUR_USERNAME/kondate-planner:*"
+           }
+         }
+       }
+     ]
+   }
+   ```
+
+3. **必要な権限をアタッチ**:
+   - CloudFormation (スタック作成/更新)
+   - S3 (SAMアーティファクトアップロード)
+   - Lambda (関数作成/更新)
+   - IAM (ロール作成/更新)
+   - DynamoDB (テーブル作成/更新)
+   - Bedrock (エージェント作成/更新)
+   - Chatbot (Slack設定作成/更新)
+
+#### 2. GitHub Secretsの設定
+
+リポジトリのSettings → Secrets and variables → Actionsで以下を追加:
+
+- `AWS_ROLE_ARN`: 上記で作成したIAM RoleのARN
+- `SLACK_WORKSPACE_ID`: SlackワークスペースID
+- `SLACK_CHANNEL_ID`: SlackチャンネルID
+
+### ワークフローファイル
+
+`.github/workflows/deploy.yml` を作成してください（詳細は issue #39 を参照）。
+
+### 手動デプロイ
+
+GitHub ActionsのUIから手動でワークフローを実行可能:
+1. Actions → Deploy SAM Application to AWS → Run workflow
+
+### デプロイ後の確認
+
+```bash
+# スタックの出力を確認
+aws cloudformation describe-stacks --stack-name kondate-planner \
+  --query 'Stacks[0].Outputs' --output table
+```
+
 ## トラブルシューティング
 
 - **エージェントが応答しない**: CloudWatch Logsでエラーを確認してください
